@@ -6,3 +6,28 @@ html, body, #root {
   height: 100%;
   margin: 0;
 }
+
+body {
+  @apply bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300;
+}
+
+/* Custom button and input styles */
+.btn-primary {
+    @apply px-4 py-2 bg-sky-600 text-white font-semibold rounded-lg shadow-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-75 disabled:opacity-50;
+}
+
+.btn-secondary {
+    @apply px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-opacity-75;
+}
+
+.btn-danger {
+    @apply px-3 py-1 bg-red-500 text-white font-semibold rounded-md text-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500;
+}
+
+.input-field {
+    @apply w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 focus:ring-2 focus:ring-sky-500 focus:border-sky-500;
+}
+
+.card {
+    @apply bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg transition-shadow duration-300;
+}

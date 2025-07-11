@@ -1,12 +1,30 @@
 import { useState, useEffect } from 'react';
 import { getRecipes } from '../firebase';
-import { mockRecipes } from '../mockData';
 
 export function useRecipes() {
   const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    if (import.meta.env.DEV) setRecipes(mockRecipes);
-    else getRecipes().then(setRecipes);
+    async function fetchData() {
+      try {
+        let data;
+        if (import.meta.env.DEV) {
+          data = mockRecipes;
+        } else {
+          data = await getRecipes();
+        }
+        setRecipes(data);
+      } catch (err) {
+        setError(err);
+        console.error("Failed to fetch recipes:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
-  return { recipes, setRecipes };
+
+  return { recipes, loading, error, setRecipes };
 }

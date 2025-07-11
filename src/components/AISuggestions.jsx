@@ -1,18 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { mockSuggestions } from '../mockData';
 
 export default function AISuggestions() {
   const [suggestions, setSuggestions] = useState([]);
+
   useEffect(() => {
-    if (import.meta.env.DEV) setSuggestions(mockSuggestions);
-    else setSuggestions([]); // replace with real API call later
+    // This is where you would make a real API call in the future.
+    // For now, we leave it empty to remove mock data.
+    setSuggestions([]);
   }, []);
-  if (!suggestions.length) return <p>No suggestions.</p>;
+
   return (
-    <ul className="space-y-2">
-      {suggestions.map(s => (
-        <li key={s.id} className="p-2 bg-white dark:bg-gray-700 rounded">{s.text}</li>
-      ))}
-    </ul>
+    <div className="card">
+        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">AI Suggestions</h3>
+        {suggestions.length > 0 ? (
+            <ul className="space-y-2">
+                {suggestions.map(s => (
+                    <li key={s.id} className="p-3 bg-sky-50 dark:bg-sky-900/50 rounded-lg text-sm">
+                        {s.text}
+                    </li>
+                ))}
+            </ul>
+        ) : (
+            <p className="text-slate-500 dark:text-slate-400 text-sm">
+                No AI suggestions available at this time.
+            </p>
+        )}
+    </div>
   );
 }

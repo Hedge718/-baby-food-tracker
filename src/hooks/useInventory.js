@@ -1,12 +1,26 @@
 import { useState, useEffect } from 'react';
-import { getInventory } from '../firebase';
-import { mockInventory } from '../mockData';
+import { getInventory, addInventoryItem } from '../firebase';
 
 export function useInventory() {
   const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    if (import.meta.env.DEV) setInventory(mockInventory);
-    else getInventory().then(setInventory);
+    async function fetchData() {
+      try {
+        const data = await getInventory();
+        setInventory(data);
+      } catch (err) {
+        setError(err);
+        console.error("Failed to fetch inventory:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
-  return { inventory, setInventory };
+
+  // Expose the add function
+  return { inventory, loading, error, setInventory, addInventoryItem };
 }

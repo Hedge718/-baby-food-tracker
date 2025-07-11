@@ -1,26 +1,25 @@
-// src/components/FeedingHistory.jsx
 import React from 'react';
-import { useFeedingHistory } from '../hooks/useFeedingHistory';
 import { format } from 'date-fns';
 
-export default function FeedingHistory() {
-  const { history } = useFeedingHistory();
-  if (!history.length) return <p>No feeding history.</p>;
+export default function FeedingHistory({ history, loading, error }) {
+  if (loading) return <p className="text-slate-500">Loading history...</p>;
+  if (error) return <p className="text-red-500">Could not load feeding history.</p>;
+  if (!history.length) return <p className="text-slate-500">No feeding history recorded yet.</p>;
+
   return (
-    <ul className="space-y-2">
-      {history.map(h => (
-        <li
-          key={h.id}
-          className="p-2 bg-white dark:bg-gray-700 rounded flex justify-between"
-        >
-          <span>
-            {h.name} — {h.amount}c
-          </span>
-          <span className="text-sm text-gray-500">
-            {format(new Date(h.timestamp), 'PP p')}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="card">
+      <ul className="space-y-3">
+        {history.map(h => (
+          <li key={h.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg flex justify-between items-center">
+            <div>
+              <span className="font-semibold">{h.name}</span> — {h.amount} cubes
+            </div>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {format(new Date(h.timestamp), 'MMM d, h:mm a')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
