@@ -11,12 +11,16 @@
   "dependencies": {
     "date-fns": "^2.30.0",
     "firebase": "^9.23.0",
+    "framer-motion": "^12.23.5",
     "lucide-react": "^0.309.0",
+    "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.21.1",
-    "react-select": "^5.10.2"
+    "react-select": "^5.10.2",
+    "react-swipeable": "^7.0.2",
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",

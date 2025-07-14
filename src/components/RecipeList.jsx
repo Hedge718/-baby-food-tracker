@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import RecipeCard from './RecipeCard';
 import { Search } from 'lucide-react';
 
-export default function RecipeList({ recipes, inventory, onDeleteRecipe, onCookRecipe }) {
+export default function RecipeList({ recipes, inventory, fullInventory, onDeleteRecipe, onCookRecipe }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const recipesWithCookability = useMemo(() => {
@@ -40,7 +40,7 @@ export default function RecipeList({ recipes, inventory, onDeleteRecipe, onCookR
             <RecipeCard 
               key={recipe.id} 
               recipe={recipe}
-              inventory={inventory}
+              fullInventory={fullInventory}
               onDelete={onDeleteRecipe}
               onCook={onCookRecipe}
             />

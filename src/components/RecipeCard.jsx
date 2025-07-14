@@ -2,7 +2,7 @@ import React from 'react';
 import { Utensils, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function RecipeCard({ recipe, inventory, onDelete, onCook }) {
+export default function RecipeCard({ recipe, fullInventory, onDelete, onCook }) {
   const handleCookClick = () => {
     if (recipe.canCook) {
       onCook(recipe);
@@ -12,7 +12,7 @@ export default function RecipeCard({ recipe, inventory, onDelete, onCook }) {
   };
 
   const getIngredientName = (id) => {
-    const item = (inventory || []).find(i => i.id === id);
+    const item = (fullInventory || []).find(i => i.id === id);
     return item ? item.name : 'Unknown Food';
   };
 

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { PlusCircle, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function InventoryForm({ onAddFood, onAddToShoppingList }) {
+export default function InventoryForm({ onAddFood }) {
   const [name, setName] = useState('');
   const [cubes, setCubes] = useState(12);
   const [isForShoppingList, setIsForShoppingList] = useState(false);
+  const [status, setStatus] = useState('new');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,10 +16,10 @@ export default function InventoryForm({ onAddFood, onAddToShoppingList }) {
     }
 
     if (isForShoppingList) {
-        await onAddToShoppingList(name);
+        await onAddFood({ name, isForShoppingList: true });
     } else {
         if (cubes > 0) {
-            await onAddFood({ name, cubesLeft: Number(cubes) });
+            await onAddFood({ name, cubesLeft: Number(cubes), status, isForShoppingList: false });
         } else {
             toast.error("Please enter a cube count greater than zero.");
         }
@@ -26,6 +27,8 @@ export default function InventoryForm({ onAddFood, onAddToShoppingList }) {
     
     setName('');
     setCubes(12);
+    setStatus('new');
+    setIsForShoppingList(false);
   };
 
   return (
@@ -34,14 +37,23 @@ export default function InventoryForm({ onAddFood, onAddToShoppingList }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="foodName" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Food Name</label>
-          <input id="foodName" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., bell pepper" className="input-field" required />
+          <input id="foodName" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Pear" className="input-field" required />
         </div>
         
         {!isForShoppingList && (
-            <div>
-              <label htmlFor="cubes" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Number of Cubes in Batch</label>
-              <input id="cubes" type="number" value={cubes} onChange={(e) => setCubes(e.target.value)} className="input-field" min="1" required />
-            </div>
+            <>
+                <div>
+                  <label htmlFor="cubes" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Number of Cubes in Batch</label>
+                  <input id="cubes" type="number" value={cubes} onChange={(e) => setCubes(e.target.value)} className="input-field" min="1" required />
+                </div>
+                <div>
+                  <label htmlFor="status" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Initial Status</label>
+                  <select id="status" value={status} onChange={e => setStatus(e.target.value)} className="input-field">
+                      <option value="new">New Food</option>
+                      <option value="liked">Liked</option>
+                  </select>
+                </div>
+            </>
         )}
 
         <div className="flex items-center gap-2 pt-2">

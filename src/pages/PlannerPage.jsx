@@ -7,19 +7,19 @@ import Select from 'react-select';
 
 function PlanMealModal({ date, mealType, onClose, onSave }) {
     const { inventory, recipes } = useData();
-    const [selectedItemId, setSelectedItemId] = useState('');
+    const [selectedItemId, setSelectedItemId] = useState(null);
     const [isIngredient, setIsIngredient] = useState(false);
     const [amount, setAmount] = useState(1);
 
     const canCookRecipe = (recipe) => {
         return (recipe.ingredients || []).every(ing => {
             const itemInStock = inventory.find(i => i.id === ing.itemId);
-            return itemInStock && itemInStock.cubesLeft >= ing.cubesRequired;
+            return itemInStock && itemInStock.cubesAvailable >= ing.cubesRequired;
         });
     };
     
     const availableItems = (isIngredient 
-        ? inventory.filter(i => i.cubesLeft > 0)
+        ? inventory.filter(i => i.cubesAvailable > 0)
         : recipes.map(r => ({ ...r, canCook: canCookRecipe(r) }))
     ).map(item => ({ value: item.id, label: item.name, isDisabled: !isIngredient && !item.canCook }));
 
@@ -42,10 +42,13 @@ function PlanMealModal({ date, mealType, onClose, onSave }) {
                         onChange={(option) => setSelectedItemId(option.value)}
                         className="flex-grow"
                         placeholder={isIngredient ? 'Select Ingredient...' : 'Select Recipe...'}
-                        styles={{ control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.15rem' }) }}
+                        styles={{ 
+                            control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.15rem' }),
+                            option: (styles, { isDisabled }) => ({ ...styles, color: isDisabled ? '#999' : '#333' })
+                        }}
                     />
                     <div className="flex items-center gap-2">
-                        <input type="checkbox" id="isIngredientModal" checked={isIngredient} onChange={(e) => setIsIngredient(e.target.checked)} className="h-4 w-4 rounded text-[var(--accent-light)] focus:ring-[var(--accent-light)]"/>
+                        <input type="checkbox" id="isIngredientModal" checked={isIngredient} onChange={(e) => { setIsIngredient(e.target.checked); setSelectedItemId(null); }} className="h-4 w-4 rounded text-[var(--accent-light)] focus:ring-[var(--accent-light)]"/>
                         <label htmlFor="isIngredientModal">Plan a single ingredient instead</label>
                     </div>
                     {isIngredient && selectedItemId && (
@@ -65,7 +68,7 @@ function PlanMealModal({ date, mealType, onClose, onSave }) {
 }
 
 export default function PlannerPage() {
-    const { inventory, recipes, plans, handleAddPlan, handleDeletePlan, handleCookRecipe, setHistory, setInventory, handleLogUsage } = useData();
+    const { inventory, recipes, plans, handleAddPlan, handleDeletePlan, handleCookRecipe, handleLogUsage } = useData();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalData, setModalData] = useState(null);
@@ -92,7 +95,7 @@ export default function PlannerPage() {
       if (isRecipe) {
         const recipeToCook = recipes.find(r => r.id === itemId);
         if (recipeToCook) {
-          handleCookRecipe(recipeToCook, inventory, setInventory, setHistory);
+          handleCookRecipe(recipeToCook);
           handleDeletePlan(plan.id);
         } else {
           toast.error("Recipe not found!");
@@ -100,7 +103,7 @@ export default function PlannerPage() {
       } else {
         const inventoryItem = inventory.find(i => i.id === itemId);
         if (inventoryItem && inventoryItem.cubesLeft >= amount) {
-          handleLogUsage(inventoryItem, amount, false, setHistory, () => {});
+          handleLogUsage(inventoryItem, amount, false);
           handleDeletePlan(plan.id);
         } else {
           toast.error(`Not enough ${inventoryItem ? inventoryItem.name : 'food'} in inventory!`);
@@ -119,15 +122,15 @@ export default function PlannerPage() {
             
             <div className="flex justify-between items-center">
                 <button onClick={() => setCurrentDate(subWeeks(currentDate, 1))} className="p-2 rounded-full hover:bg-slate-200/60 dark:hover:bg-[#4A5568]/60"><ChevronLeft /></button>
-                <h3 className="text-xl font-bold">{format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}</h3>
+                <h3 className="text-xl font-bold text-center">{format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}</h3>
                 <button onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="p-2 rounded-full hover:bg-slate-200/60 dark:hover:bg-[#4A5568]/60"><ChevronRight /></button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 {days.map(day => (
-                    <div key={day.toString()} className="card !p-3 space-y-2 bg-slate-50 dark:bg-slate-800/50">
+                    <div key={day.toString()} className="card !p-3 space-y-2 bg-slate-50 dark:bg-slate-800/50 h-full">
                         <p className="font-extrabold text-center">{format(day, 'E')}</p>
-                        <p className="text-sm text-center -mt-2">{format(day, 'd')}</p>
+                        <p className="text-sm text-center -mt-2 mb-2">{format(day, 'd')}</p>
                         <div className="space-y-2">
                             {mealTypes.map(meal => {
                                 const plannedMeals = (plans || []).filter(p => isSameDay(new Date(p.date), day) && p.mealType.toLowerCase() === meal.toLowerCase());

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, writeBatch, deleteDoc, where } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, writeBatch, deleteDoc, where, getDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
@@ -40,7 +40,7 @@ export async function getShoppingList() {
 
 export async function addItemToShoppingList(itemName) {
     const docRef = await addDoc(collection(db, 'shoppingList'), { name: itemName, createdAt: serverTimestamp() });
-    return { id: docRef.id, name: itemName, createdAt: new Date().toISOString() };
+    return { id: docRef.id, name: itemName, createdAt: new Date() };
 }
 
 export async function removeItemFromShoppingList(itemId) {
@@ -53,7 +53,13 @@ export async function logUsageAndUpdateInventory(item, newCubesLeft, amountUsed,
   batch.update(inventoryRef, { cubesLeft: newCubesLeft });
 
   const historyRef = doc(collection(db, 'history'));
-  batch.set(historyRef, { name: item.name, amount: amountUsed, type: isTrash ? 'wasted' : 'eaten', timestamp: serverTimestamp() });
+  const newHistoryEntry = { 
+    name: item.name, 
+    amount: amountUsed, 
+    type: isTrash ? 'wasted' : 'eaten', 
+    timestamp: serverTimestamp() 
+  };
+  batch.set(historyRef, newHistoryEntry);
   
   if (newCubesLeft <= 0) {
     const shoppingListQuery = query(collection(db, 'shoppingList'), where("name", "==", item.name));
@@ -64,6 +70,7 @@ export async function logUsageAndUpdateInventory(item, newCubesLeft, amountUsed,
     }
   }
   await batch.commit();
+  return { ...newHistoryEntry, id: historyRef.id, timestamp: new Date() };
 }
 
 export async function getInventory() {
@@ -72,13 +79,18 @@ export async function getInventory() {
 }
 
 export async function addNewInventoryItem(itemData) {
-    const docRef = await addDoc(collection(db, 'inventory'), { name: itemData.name, cubesLeft: itemData.cubesLeft, createdAt: serverTimestamp() });
+    const docRef = await addDoc(collection(db, 'inventory'), { ...itemData, createdAt: serverTimestamp() });
     return { id: docRef.id, ...itemData, createdAt: new Date() };
 }
 
 export async function updateExistingInventoryItem(itemId, newCubesLeft) {
     const itemRef = doc(db, 'inventory', itemId);
     await updateDoc(itemRef, { cubesLeft: newCubesLeft });
+}
+
+export async function updateInventoryItemStatus(itemId, status) {
+    const itemRef = doc(db, 'inventory', itemId);
+    await updateDoc(itemRef, { status });
 }
 
 export async function getRecipes() {
@@ -97,19 +109,26 @@ export async function deleteRecipe(recipeId) {
 
 export async function cookRecipeInDb(recipe, inventory) {
     const batch = writeBatch(db);
+    const updatedInventoryItems = [];
+
     for (const ingredient of recipe.ingredients) {
         const inventoryItem = inventory.find(i => i.id === ingredient.itemId);
         if (inventoryItem) {
             const inventoryRef = doc(db, 'inventory', ingredient.itemId);
             const newCubesLeft = inventoryItem.cubesLeft - ingredient.cubesRequired;
             batch.update(inventoryRef, { cubesLeft: newCubesLeft });
+            updatedInventoryItems.push({ id: ingredient.itemId, newCubesLeft });
         }
     }
     const historyRef = doc(collection(db, 'history'));
     const totalCubes = recipe.ingredients.reduce((sum, ing) => sum + ing.cubesRequired, 0);
-    batch.set(historyRef, { name: recipe.name, amount: totalCubes, type: 'recipe', timestamp: serverTimestamp() });
+    const newHistoryEntry = { name: recipe.name, amount: totalCubes, type: 'recipe', timestamp: serverTimestamp() };
+    batch.set(historyRef, newHistoryEntry);
     await batch.commit();
+
+    return { newHistoryEntry: { ...newHistoryEntry, id: historyRef.id, timestamp: new Date() }, updatedInventoryItems };
 }
+
 export async function getMealPlans() {
     const snap = await getDocs(query(collection(db, 'mealPlans'), orderBy('date', 'asc')));
     return snap.docs.map(docToData);
@@ -120,7 +139,7 @@ export async function addMealPlan(planData) {
         ...planData,
         date: new Date(planData.date) 
     });
-    return { id: docRef.id, ...planData };
+    return { id: docRef.id, ...planData, date: new Date(planData.date) };
 }
 
 export async function deleteMealPlan(planId) {
