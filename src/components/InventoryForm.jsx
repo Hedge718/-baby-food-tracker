@@ -1,70 +1,57 @@
 import React, { useState } from 'react';
+import { PlusCircle, ShoppingCart } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-export default function InventoryForm({ onAddItem, inventory, setInventory }) {
+export default function InventoryForm({ onAddFood, onAddToShoppingList }) {
   const [name, setName] = useState('');
-  const [totalCubes, setTotalCubes] = useState(12);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cubes, setCubes] = useState(12);
+  const [isForShoppingList, setIsForShoppingList] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || totalCubes <= 0) {
-      alert('Please provide a valid name and number of cubes.');
-      return;
+    if (!name.trim()) {
+        toast.error("Please enter a food name.");
+        return;
     }
-    setIsSubmitting(true);
-    try {
-      // Call the function passed from the hook to add the item
-      const newItem = await onAddItem({
-        name,
-        totalCubes: Number(totalCubes),
-        cubesLeft: Number(totalCubes), // Start with a full batch
-      });
-      // Optimistically update UI
-      setInventory(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-      setName('');
-      setTotalCubes(12);
-    } catch (error) {
-      console.error("Failed to add inventory item:", error);
-      alert("Error: Could not add item to inventory.");
-    } finally {
-      setIsSubmitting(false);
+
+    if (isForShoppingList) {
+        await onAddToShoppingList(name);
+    } else {
+        if (cubes > 0) {
+            await onAddFood({ name, cubesLeft: Number(cubes) });
+        } else {
+            toast.error("Please enter a cube count greater than zero.");
+        }
     }
+    
+    setName('');
+    setCubes(12);
   };
 
   return (
     <div className="card">
-      <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Add New Food</h3>
+      <h3 className="text-xl mb-4">Add Food</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="foodName" className="block text-sm font-medium text-slate-600 dark:text-slate-300">
-            Food Name
-          </label>
-          <input
-            id="foodName"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Sweet Potato"
-            className="input-field mt-1"
-            required
-          />
+          <label htmlFor="foodName" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Food Name</label>
+          <input id="foodName" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., bell pepper" className="input-field" required />
         </div>
-        <div>
-          <label htmlFor="totalCubes" className="block text-sm font-medium text-slate-600 dark:text-slate-300">
-            Number of Cubes
-          </label>
-          <input
-            id="totalCubes"
-            type="number"
-            value={totalCubes}
-            onChange={(e) => setTotalCubes(e.target.value)}
-            className="input-field mt-1"
-            min="1"
-            required
-          />
+        
+        {!isForShoppingList && (
+            <div>
+              <label htmlFor="cubes" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Number of Cubes in Batch</label>
+              <input id="cubes" type="number" value={cubes} onChange={(e) => setCubes(e.target.value)} className="input-field" min="1" required />
+            </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-2">
+            <input type="checkbox" id="isForShoppingList" checked={isForShoppingList} onChange={(e) => setIsForShoppingList(e.target.checked)} className="h-4 w-4 rounded text-[var(--accent-light)] focus:ring-[var(--accent-light)]"/>
+            <label htmlFor="isForShoppingList" className="text-sm text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]">Add to shopping list instead</label>
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Adding...' : 'Add to Inventory'}
+
+        <button type="submit" className="btn-primary w-full !mt-6">
+          {isForShoppingList ? <ShoppingCart size={20} /> : <PlusCircle size={20} />}
+          <span>{isForShoppingList ? 'Add to Shopping List' : 'Add to Inventory'}</span>
         </button>
       </form>
     </div>

@@ -1,101 +1,87 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { useInventory } from './hooks/useInventory';
-import { useFeedingHistory } from './hooks/useFeedingHistory';
-import { useMealPlans } from './hooks/useMealPlans';
-import { useRecipes } from './hooks/useRecipes';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { LayoutDashboard, Calendar, BookOpen, Sun, Moon, ShoppingCart } from 'lucide-react';
 
-import FoodInventoryItem from './components/FoodInventoryItem';
-import FeedingHistory from './components/FeedingHistory';
-import AISuggestions from './components/AISuggestions';
-import MealPlanCalendar from './components/MealPlanCalendar';
-import RecipeForm from './components/RecipeForm';
-import RecipeList from './components/RecipeList';
-import InventoryForm from './components/InventoryForm';
+// Import Page Components
+import DashboardPage from './pages/DashboardPage';
+import PlannerPage from './pages/PlannerPage';
+import RecipesPage from './pages/RecipesPage';
+import ShoppingListPage from './pages/ShoppingListPage';
 
-function App() {
-  const { inventory, loading: inventoryLoading, error: inventoryError, setInventory, addInventoryItem } = useInventory();
-  const { history, loading: historyLoading, error: historyError } = useFeedingHistory();
-  const { plans } = useMealPlans();
-  const { recipes } = useRecipes();
-  const [darkMode, setDarkMode] = useState(false);
+function NavLink({ to, icon, children, isMobile = false }) {
+    const location = useLocation();
+    const isActive = location.pathname === to;
+    
+    const activeClass = 'text-[var(--accent-light)] dark:text-[var(--accent-dark)] bg-[#C1A9D4]/10 dark:bg-[#D6BCFA]/10';
+    const inactiveClass = 'text-slate-500 dark:text-slate-400 hover:text-[var(--accent-light)] dark:hover:text-[var(--accent-dark)]';
 
-  useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        setDarkMode(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
-
-  return (
-    <div className="min-h-screen">
-      <header className="bg-white/70 dark:bg-slate-900/80 backdrop-blur-lg sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-                <h1 className="text-3xl font-bold text-sky-600 dark:text-sky-500">
-                    Baby Food Tracker
-                </h1>
-                <button onClick={() => setDarkMode(!darkMode)} className="btn-secondary">
-                    {darkMode ? '☀️' : '🌙'}
-                </button>
-            </div>
-            <nav className="flex space-x-4 border-t border-slate-200 dark:border-slate-700 -mb-px">
-              <Link to="/" className="border-transparent text-slate-500 hover:border-sky-500 hover:text-sky-600 border-b-2 px-1 pt-4 text-sm font-medium">Dashboard</Link>
-              <Link to="/planner" className="border-transparent text-slate-500 hover:border-sky-500 hover:text-sky-600 border-b-2 px-1 pt-4 text-sm font-medium">Planner</Link>
-              <Link to="/recipes" className="border-transparent text-slate-500 hover:border-sky-500 hover:text-sky-600 border-b-2 px-1 pt-4 text-sm font-medium">Recipes</Link>
-            </nav>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-        <Routes>
-          <Route path="/" element={
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                <section>
-                  <h2 className="text-2xl font-bold mb-4">Inventory</h2>
-                  {inventoryLoading && <p>Loading inventory...</p>}
-                  {inventoryError && <p className="text-red-500">Error loading inventory.</p>}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {inventory.map(i => <FoodInventoryItem key={i.id} item={i} />)}
-                  </div>
-                </section>
-                <section>
-                  <h2 className="text-2xl font-bold mb-4">Feeding History</h2>
-                  <FeedingHistory history={history} loading={historyLoading} error={historyError} />
-                </section>
-              </div>
-              <div className="lg:col-span-1 space-y-8">
-                <section>
-                    <InventoryForm onAddItem={addInventoryItem} inventory={inventory} setInventory={setInventory} />
-                </section>
-                <section>
-                    <h2 className="text-2xl font-bold mb-4">AI Suggestions</h2>
-                    <AISuggestions />
-                </section>
-              </div>
-            </div>
-          } />
-          <Route path="/planner" element={<MealPlanCalendar plans={plans} />} />
-          <Route path="/recipes" element={
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <RecipeForm />
-              <RecipeList />
-            </div>
-          } />
-        </Routes>
-      </main>
-    </div>
-  );
+    const mobileClasses = 'flex flex-col items-center flex-1 py-2';
+    const desktopClasses = 'flex items-center gap-3 px-3 py-2 rounded-lg';
+    
+    return (
+        <Link to={to} className={`font-bold transition-colors ${isActive ? activeClass : inactiveClass} ${isMobile ? mobileClasses : desktopClasses}`}>
+            {icon}
+            <span className={isMobile ? 'text-xs' : 'hidden lg:inline'}>{children}</span>
+        </Link>
+    );
 }
 
-export default function AppWrapper() {
+// This is the main application shell
+export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('darkMode');
+    if (savedTheme !== null) return savedTheme === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [isDarkMode]);
+
   return (
-    <Router>
-      <App />
-    </Router>
+    <div className="flex min-h-screen">
+      <Toaster position="top-center" />
+      
+      <aside className="hidden lg:flex w-64 flex-col p-4 bg-white/60 dark:bg-[#4A5568]/20 backdrop-blur-sm border-r border-[var(--border-light)] dark:border-[var(--border-dark)]">
+          <div className="px-3 mb-10">
+            <h1 className="text-2xl font-extrabold text-[var(--accent-light)] dark:text-[var(--accent-dark)]">BabyFeed</h1>
+          </div>
+          <nav className="flex flex-col space-y-2">
+              <NavLink to="/" icon={<LayoutDashboard size={20}/>}>Dashboard</NavLink>
+              <NavLink to="/shopping-list" icon={<ShoppingCart size={20}/>}>Shopping List</NavLink>
+              <NavLink to="/planner" icon={<Calendar size={20}/>}>Planner</NavLink>
+              <NavLink to="/recipes" icon={<BookOpen size={20}/>}>Recipes</NavLink>
+          </nav>
+          <button onClick={() => setIsDarkMode(prev => !prev)} className="mt-auto flex items-center gap-3 px-3 py-2 text-base font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#4A5568]/60 rounded-lg">
+            {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+      </aside>
+
+      <div className="flex-1 pb-24 lg:pb-0">
+          <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/planner" element={<PlannerPage />} />
+              <Route path="/recipes" element={<RecipesPage />} />
+              <Route path="/shopping-list" element={<ShoppingListPage />} />
+            </Routes>
+          </main>
+      </div>
+
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#2D3748]/95 backdrop-blur-lg border-t border-[var(--border-light)] dark:border-[var(--border-dark)] flex justify-around">
+        <NavLink to="/" icon={<LayoutDashboard size={24}/>} isMobile={true}>Dashboard</NavLink>
+        <NavLink to="/shopping-list" icon={<ShoppingCart size={24}/>} isMobile={true}>Shopping</NavLink>
+        <NavLink to="/planner" icon={<Calendar size={24}/>} isMobile={true}>Planner</NavLink>
+        <NavLink to="/recipes" icon={<BookOpen size={24}/>} isMobile={true}>Recipes</NavLink>
+      </nav>
+    </div>
   );
 }

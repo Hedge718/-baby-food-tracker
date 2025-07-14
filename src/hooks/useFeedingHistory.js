@@ -1,27 +1,37 @@
-// Example for: src/hooks/useFeedingHistory.js
-// Apply the same pattern to useMealPlans.js and useRecipes.js
 import { useState, useEffect } from 'react';
-import { getHistory } from '../firebase'; // or getMealPlans, getRecipes
+import toast from 'react-hot-toast';
+import { getHistory, deleteHistoryItem } from '../firebase';
 
-export function useFeedingHistory() { // or useMealPlans, useRecipes
-  const [history, setHistory] = useState([]); // or plans, recipes
+export function useFeedingHistory() {
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
-      try {
-        const data = await getHistory(); // or getMealPlans(), getRecipes()
-        setHistory(data); // or setPlans(data), setRecipes(data)
-      } catch (err) {
-        setError(err);
-        console.error("Failed to fetch data:", err);
-      } finally {
-        setLoading(false);
-      }
+        try {
+            const data = await getHistory();
+            setHistory(data);
+        } catch (err) {
+            console.error("Failed to fetch history:", err);
+        } finally {
+            setLoading(false);
+        }
     }
     fetchData();
   }, []);
 
-  return { history, loading, error, setHistory }; // or plans, recipes
+  const handleDeleteHistoryItem = async (historyId) => {
+    const originalHistory = [...history];
+    setHistory(prev => prev.filter(item => item.id !== historyId));
+
+    try {
+        await deleteHistoryItem(historyId);
+        toast.success('History item deleted.');
+    } catch (err) {
+        toast.error('Failed to delete item.');
+        setHistory(originalHistory);
+    }
+  };
+
+  return { history, loading, setHistory, handleDeleteHistoryItem };
 }

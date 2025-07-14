@@ -2,32 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
+html {
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Nunito', sans-serif;
+}
+
+/* --- Color Palette Definition --- */
+:root {
+  /* Light Mode */
+  --bg-light: #F8F9FA;
+  --card-light: #FFFFFF;
+  --text-primary-light: #212529;
+  --text-secondary-light: #6C757D;
+  --accent-light: #A082B9;
+  --border-light: #E9ECEF;
+
+  /* Dark Mode */
+  --bg-dark: #1A1A1A;
+  --card-dark: #2C2C2E;
+  --text-primary-dark: #F8F9FA;
+  --text-secondary-dark: #A0AEC0;
+  --accent-dark: #C1A9D4;
+  --border-dark: #3E3E40;
 }
 
 body {
-  @apply bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300;
+  @apply bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] text-[var(--text-primary-light)] dark:text-[var(--text-primary-dark)] transition-colors duration-300;
 }
 
-/* Custom button and input styles */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-extrabold;
+}
+
+/* --- Component Styles --- */
+.card {
+  @apply bg-[var(--card-light)] dark:bg-[var(--card-dark)] p-5 rounded-2xl shadow-sm border border-[var(--border-light)] dark:border-[var(--border-dark)] transition-colors duration-300;
+}
+
 .btn-primary {
-    @apply px-4 py-2 bg-sky-600 text-white font-semibold rounded-lg shadow-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-75 disabled:opacity-50;
-}
-
-.btn-secondary {
-    @apply px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-opacity-75;
-}
-
-.btn-danger {
-    @apply px-3 py-1 bg-red-500 text-white font-semibold rounded-md text-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500;
+  @apply flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--accent-light)] dark:bg-[var(--accent-dark)] text-white dark:text-slate-800 font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--accent-light)] dark:focus:ring-[var(--accent-dark)] transition-all duration-200;
 }
 
 .input-field {
-    @apply w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 focus:ring-2 focus:ring-sky-500 focus:border-sky-500;
-}
-
-.card {
-    @apply bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg transition-shadow duration-300;
+  @apply w-full p-2.5 border border-[var(--border-light)] dark:border-[var(--border-dark)] rounded-xl bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-[var(--accent-light)] dark:focus:ring-[var(--accent-dark)] focus:border-transparent transition-colors duration-200;
 }
