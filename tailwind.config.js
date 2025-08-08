@@ -1,16 +1,17 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  darkMode: 'class',
+  darkMode: 'class', // ← required for manual theme toggling
+  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Nunito', 'sans-serif'],
-      }
+        sans: [
+          'Inter', 'ui-sans-serif', 'system-ui', '-apple-system',
+          'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans',
+          'Apple Color Emoji', 'Segoe UI Emoji'
+        ],
+      },
     },
   },
   plugins: [],
-}
+};

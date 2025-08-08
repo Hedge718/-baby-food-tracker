@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import {
-  LayoutDashboard, Calendar, BookOpen, Sun, Moon,
+  LayoutDashboard, Calendar, BookOpen,
   ShoppingCart, BarChart2, Package
 } from 'lucide-react';
 
@@ -18,6 +18,7 @@ import { useData } from './context/DataContext';
 import FAB from './components/FAB.jsx';
 import QuickAddSheet from './components/QuickAddSheet.jsx';
 import QuickAddForms from './components/QuickAddForms.jsx';
+import ThemeToggle from './components/ThemeToggle.jsx';
 
 function NavLink({ to, icon, children, isMobile = false }) {
   const location = useLocation();
@@ -46,17 +47,7 @@ export default function App() {
   const { loading } = useData();
   const location = useLocation();
 
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
-    localStorage.setItem('darkMode', String(isDarkMode));
-  }, [isDarkMode]);
-
-  // Quick Add
+  // Quick Add (mobile sheet)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState('Feeding');
   useEffect(() => {
@@ -78,7 +69,9 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] pt-safe">
+      {/* Global toaster + floating theme toggle */}
       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+      <ThemeToggle />
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 flex-col p-4 bg-white/60 dark:bg-[#4A5568]/20 backdrop-blur-sm border-r border-[var(--border-light)] dark:border-[var(--border-dark)]">
@@ -95,14 +88,7 @@ export default function App() {
           <NavLink to="/recipes" icon={<BookOpen size={18} />}>Recipes</NavLink>
           <NavLink to="/reports" icon={<BarChart2 size={18} />}>Reports</NavLink>
         </nav>
-
-        <button
-          onClick={() => setIsDarkMode((v) => !v)}
-          className="mt-auto flex items-center gap-3 px-3 py-2 text-base font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#4A5568]/60 rounded-lg"
-        >
-          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-          <span className="hidden lg:inline">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-        </button>
+        {/* (Desktop theme toggle is the floating button; no sidebar toggle needed) */}
       </aside>
 
       {/* Main */}
@@ -122,7 +108,12 @@ export default function App() {
         {/* Mobile: FAB + Quick Add Sheet */}
         <div className="lg:hidden fab">
           <FAB onClick={() => setSheetOpen(true)} />
-          <QuickAddSheet open={sheetOpen} onClose={() => setSheetOpen(false)} tab={sheetTab} setTab={setSheetTab}>
+          <QuickAddSheet
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            tab={sheetTab}
+            setTab={setSheetTab}
+          >
             <QuickAddForms tab={sheetTab} onDone={() => setSheetOpen(false)} />
           </QuickAddSheet>
         </div>
