@@ -121,3 +121,14 @@ input[disabled], select[disabled], textarea[disabled] { opacity: .6; cursor: not
 
 /* Recharts labels on dark */
 .dark .recharts-text, .dark .recharts-legend-item-text { fill: #cbd5e1 !important; }
+
+/* ----- FORCE readable text in dark mode ----- */
+body { color: #0f172a; }           /* light theme default text */
+.dark body { color: #e5e7eb; }     /* dark theme default text */
+
+/* Links follow theme, too */
+a { color: #7c3aed; }
+.dark a { color: #c084fc; }
+
+/* Make form controls/UA widgets use dark palette */
+html.dark { color-scheme: dark; }
