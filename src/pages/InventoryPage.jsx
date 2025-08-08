@@ -88,21 +88,37 @@ export default function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card flex items-center gap-3">
-          <Package size={18} /><div><div className="text-xs text-muted">Items</div><div className="text-xl font-bold">{stats.items}</div></div>
+          <Package size={18} />
+          <div>
+            <div className="text-xs text-muted">Items</div>
+            <div className="text-xl font-bold">{stats.items}</div>
+          </div>
         </div>
         <div className="card flex items-center gap-3">
-          <CheckCircle2 size={18} /><div><div className="text-xs text-muted">In stock</div><div className="text-xl font-bold">{stats.inStock}</div></div>
+          <CheckCircle2 size={18} />
+          <div>
+            <div className="text-xs text-muted">In stock</div>
+            <div className="text-xl font-bold">{stats.inStock}</div>
+          </div>
         </div>
         <div className="card flex items-center gap-3">
-          <EyeOff size={18} /><div><div className="text-xs text-muted">Out</div><div className="text-xl font-bold">{stats.out}</div></div>
+          <EyeOff size={18} />
+          <div>
+            <div className="text-xs text-muted">Out</div>
+            <div className="text-xl font-bold">{stats.out}</div>
+          </div>
         </div>
         <div className="card flex items-center gap-3">
-          <Layers size={18} /><div><div className="text-xs text-muted">Portions</div><div className="text-xl font-bold">{stats.totalCubes}</div></div>
+          <Layers size={18} />
+          <div>
+            <div className="text-xs text-muted">Portions</div>
+            <div className="text-xl font-bold">{stats.totalCubes}</div>
+          </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="card space-y-3">
+      {/* Controls — now sticky */}
+      <div className="card sticky top-2 z-20">
         <input
           className="input"
           placeholder="Search..."
@@ -111,19 +127,24 @@ export default function InventoryPage() {
           inputMode="search"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 mt-3">
           <button onClick={() => setTab('all')} className={`pill ${tab==='all'?'ring-1 ring-violet-400/40':''}`}>All</button>
           <button onClick={() => setTab('in')} className={`pill ${tab==='in'?'ring-1 ring-violet-400/40':''}`}>In stock</button>
           <button onClick={() => setTab('out')} className={`pill ${tab==='out'?'ring-1 ring-violet-400/40':''}`}>Out of stock</button>
           <button onClick={() => setTab('low')} className={`pill ${tab==='low'?'ring-1 ring-violet-400/40':''}`}>Low (≤3)</button>
 
           <label className="ml-auto inline-flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" className="accent-violet-600" checked={showHidden} onChange={(e)=>setShowHidden(e.target.checked)} />
+            <input
+              type="checkbox"
+              className="accent-violet-600"
+              checked={showHidden}
+              onChange={(e)=>setShowHidden(e.target.checked)}
+            />
             Show hidden
           </label>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap mt-3">
           <label className="text-muted mr-1">Sort</label>
           <select
             className="rounded-xl border bg-transparent px-3 py-2"
@@ -135,7 +156,7 @@ export default function InventoryPage() {
             <option value="name">Name</option>
           </select>
 
-          <button className="pill ml-auto" onClick={onExport}>
+          <button className="pill ml-auto" onClick={onExport} aria-label="Export inventory as CSV">
             <Download size={16}/> Export CSV
           </button>
         </div>

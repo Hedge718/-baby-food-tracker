@@ -25,16 +25,17 @@ function NavLink({ to, icon, children, isMobile = false }) {
   const isActive = location.pathname === to;
 
   const active =
-    'text-[var(--accent-light)] dark:text-[var(--accent-dark)] bg-[#C1A9D4]/10 dark:bg-[#D6BCFA]/10';
+    'text-[var(--accent-light)] dark:text-[var(--accent-dark)] bg-[#C1A9D4]/10 dark:bg-[#D6BCFA]/10 ring-1 ring-violet-300/40 dark:ring-violet-300/30 rounded-xl';
   const inactive =
     'text-slate-500 dark:text-slate-400 hover:text-[var(--accent-light)] dark:hover:text-[var(--accent-dark)]';
 
-  const mobile = 'flex flex-col items-center flex-1 py-1.5';
+  const mobile = 'flex flex-col items-center flex-1 py-2 px-2';
   const desktop = 'flex items-center gap-3 px-3 py-2 rounded-lg';
 
   return (
     <Link
       to={to}
+      aria-current={isActive ? 'page' : undefined}
       className={`font-semibold transition-colors ${isActive ? active : inactive} ${isMobile ? mobile : desktop}`}
     >
       {icon}
@@ -59,7 +60,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)]">
+      <div className="flex items-center justify-center min-h-dvh bg-[var(--bg-light)] dark:bg-[var(--bg-dark)]">
         <div className="text-xl font-bold text-[var(--accent-light)] dark:text-[var(--accent-dark)]">
           Loading Baby Tracker...
         </div>
@@ -68,9 +69,12 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] pt-safe">
-      {/* Global toaster + floating theme toggle */}
-      <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+    <div className="flex min-h-dvh bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] pt-safe">
+      {/* Global toaster (with nicer top offset) + floating theme toggle */}
+      <Toaster
+        position="top-center"
+        toastOptions={{ duration: 3000, style: { marginTop: 'var(--toast-top-offset)' } }}
+      />
       <ThemeToggle />
 
       {/* Desktop sidebar */}
@@ -88,7 +92,6 @@ export default function App() {
           <NavLink to="/recipes" icon={<BookOpen size={18} />}>Recipes</NavLink>
           <NavLink to="/reports" icon={<BarChart2 size={18} />}>Reports</NavLink>
         </nav>
-        {/* (Desktop theme toggle is the floating button; no sidebar toggle needed) */}
       </aside>
 
       {/* Main */}

@@ -5,14 +5,12 @@ import { format } from 'date-fns';
 
 /**
  * Props it will happily accept (others are ignored):
- * - item: { id, name, cubesLeft, status, madeOn|createdAt }
+ * - item: { id, name, cubesLeft, status, madeOn|createdAt, hidden? }
  * - onLogUsage(item, amount, isTrash)
  * - onUpdateStatus(itemId, status)
  * - onSetPortions(itemId, newCubesLeft)
  * - onSetAging(itemId, dateStringYYYYMMDD)
  * - onRestock(item)   // optional – if provided, show a Restock button
- *
- * This component is resilient: all handlers are optional.
  */
 
 function toYMD(d) {
@@ -40,8 +38,11 @@ export default function FoodInventoryItem({
   );
   const [aging, setAging] = useState(madeOnDate);
 
+  const portionsLeft = Number(item?.cubesLeft || 0);
+  const maxTrack = Math.max(portionsLeft, 12); // keep a sensible track length
+
   const useNow = async () => {
-    const n = Math.max(1, Math.min(Number(qty) || 1, Number(item?.cubesLeft || 0)));
+    const n = Math.max(1, Math.min(Number(qty) || 1, portionsLeft));
     if (onLogUsage) await onLogUsage(item, n, false);
     setQty(1);
   };
@@ -57,10 +58,13 @@ export default function FoodInventoryItem({
   };
 
   const progressPct = useMemo(() => {
-    const left = Number(item?.cubesLeft || 0);
-    const max = Math.max(left, 12); // keep a sensible track length
+    const left = portionsLeft;
+    const max = maxTrack;
     return Math.max(0, Math.min(100, Math.round((left / max) * 100)));
-  }, [item?.cubesLeft]);
+  }, [portionsLeft, maxTrack]);
+
+  // id for the collapsible region (for accessibility)
+  const detailsId = `inv-more-${item?.id}`;
 
   return (
     <div className="rounded-2xl border border-[var(--border-light)] dark:border-[var(--border-dark)] bg-white dark:bg-[var(--card-dark)] p-3 sm:p-4">
@@ -69,9 +73,11 @@ export default function FoodInventoryItem({
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[15px] clamp-2">{item?.name}</div>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-            <span className="badge">{item?.cubesLeft ?? 0} portions</span>
+            <span className="badge" aria-label={`${portionsLeft} portions left`}>
+              {portionsLeft} portions
+            </span>
             {madeOnDate && (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1" aria-label={`Made on ${format(new Date(madeOnDate), 'MM/dd/yyyy')}`}>
                 <Calendar size={12} /> {format(new Date(madeOnDate), 'MM/dd')}
               </span>
             )}
@@ -83,6 +89,7 @@ export default function FoodInventoryItem({
           className="rounded-xl border bg-transparent px-2 py-1 text-sm"
           value={item?.status || 'Frozen'}
           onChange={(e) => onUpdateStatus && onUpdateStatus(item.id, e.target.value)}
+          aria-label={`Storage status for ${item?.name || 'item'}`}
         >
           <option>Frozen</option>
           <option>Fridge</option>
@@ -91,7 +98,15 @@ export default function FoodInventoryItem({
       </div>
 
       {/* Row 2: progress */}
-      <div className="mt-3 h-2 w-full rounded-full bg-slate-200/70 dark:bg-slate-700/70">
+      <div
+        className="mt-3 h-2 w-full rounded-full bg-slate-200/70 dark:bg-slate-700/70"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={maxTrack}
+        aria-valuenow={portionsLeft}
+        aria-label={`${item?.name || 'Item'} portions remaining`}
+        aria-describedby={detailsId}
+      >
         <div
           className="h-2 rounded-full"
           style={{
@@ -106,40 +121,64 @@ export default function FoodInventoryItem({
         {/* Portions setter */}
         <div className="flex items-center gap-2">
           <input
-            className="w-20 h-9 text-sm rounded-xl border bg-transparent px-3"
+            className="w-24 h-9 text-sm rounded-xl border bg-transparent px-3"
+            type="number"
             inputMode="numeric"
+            pattern="[0-9]*"
+            min="0"
+            step="1"
             value={editPortions}
             onChange={(e) => setEditPortions(e.target.value)}
-            aria-label="Set portions"
+            aria-label={`Set portions for ${item?.name || 'item'}`}
             placeholder="Set…"
           />
-          <button className="pill" onClick={savePortions}>Set</button>
+          <button
+            className="pill"
+            onClick={savePortions}
+            aria-label={`Confirm portions for ${item?.name || 'item'}`}
+          >
+            Set
+          </button>
         </div>
 
         {/* Use stepper */}
         <div className="ml-auto flex items-center gap-2">
           <button
-            className="w-9 h-9 rounded-xl border flex items-center justify-center"
+            className="w-10 h-10 rounded-xl border flex items-center justify-center"
             onClick={() => setQty((q) => Math.max(1, Number(q || 1) - 1))}
-            aria-label="decrease"
+            aria-label={`Decrease ${item?.name || 'item'} quantity by 1`}
+            title="Decrease"
           >
             <Minus size={16} />
           </button>
           <input
-            className="w-12 h-9 text-center rounded-xl border bg-transparent"
+            className="w-14 h-10 text-center rounded-xl border bg-transparent"
+            type="number"
             inputMode="numeric"
+            pattern="[0-9]*"
+            min="1"
+            step="1"
             value={qty}
             onChange={(e) => setQty(parseInt(e.target.value || '1', 10) || 1)}
-            aria-label="quantity"
+            aria-label={`Quantity to use for ${item?.name || 'item'}`}
           />
           <button
-            className="w-9 h-9 rounded-xl border flex items-center justify-center"
-            onClick={() => setQty((q) => Math.min(Number(item?.cubesLeft || 1), Number(q || 1) + 1))}
-            aria-label="increase"
+            className="w-10 h-10 rounded-xl border flex items-center justify-center"
+            onClick={() =>
+              setQty((q) => Math.min(portionsLeft || 1, Number(q || 1) + 1))
+            }
+            aria-label={`Increase ${item?.name || 'item'} quantity by 1`}
+            title="Increase"
           >
             <Plus size={16} />
           </button>
-          <button className="pill" onClick={useNow}>Use</button>
+          <button
+            className="pill"
+            onClick={useNow}
+            aria-label={`Use ${qty} portion${qty > 1 ? 's' : ''} of ${item?.name || 'item'} now`}
+          >
+            Use
+          </button>
         </div>
       </div>
 
@@ -148,13 +187,15 @@ export default function FoodInventoryItem({
         <button
           className="text-xs text-muted inline-flex items-center gap-1"
           onClick={() => setOpenMore((v) => !v)}
+          aria-expanded={openMore}
+          aria-controls={detailsId}
         >
           {openMore ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           More
         </button>
 
         {openMore && (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div id={detailsId} className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Aging */}
             <div className="flex items-center gap-2">
               <input
@@ -162,14 +203,22 @@ export default function FoodInventoryItem({
                 className="input h-9"
                 value={aging}
                 onChange={(e) => setAging(e.target.value)}
+                aria-label={`Set made-on date for ${item?.name || 'item'}`}
               />
-              <button className="pill" onClick={saveAging}>Set</button>
+              <button
+                className="pill"
+                onClick={saveAging}
+                aria-label={`Confirm made-on date for ${item?.name || 'item'}`}
+              >
+                Set
+              </button>
               <button
                 className="pill"
                 onClick={() => {
                   const ymd = toYMD(new Date());
                   setAging(ymd);
                 }}
+                aria-label={`Set made-on date for ${item?.name || 'item'} to today`}
               >
                 Today
               </button>
@@ -178,7 +227,13 @@ export default function FoodInventoryItem({
             {/* Optional: Restock */}
             {onRestock && (
               <div className="flex items-center">
-                <button className="pill" onClick={() => onRestock(item)}>Restock</button>
+                <button
+                  className="pill"
+                  onClick={() => onRestock(item)}
+                  aria-label={`Restock ${item?.name || 'item'}`}
+                >
+                  Restock
+                </button>
               </div>
             )}
           </div>

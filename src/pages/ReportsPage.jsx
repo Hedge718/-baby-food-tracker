@@ -45,12 +45,12 @@ export default function ReportsPage() {
 
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={byDay}>
-              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2}/>
-              <XAxis dataKey="day" tick={{ fontSize: 12 }}/>
-              <YAxis tick={{ fontSize: 12 }}/>
-              <Tooltip />
-              <Bar dataKey="val" fill={COLORS[0]} />
+<BarChart data={byDay} margin={{ top: 8, right: 10, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,.35)" />
+<XAxis dataKey="day" tick={{ fontSize: 12, fill: 'currentColor' }} />
+<YAxis tick={{ fontSize: 12, fill: 'currentColor' }} />
+<Bar dataKey="val" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+
             </BarChart>
           </ResponsiveContainer>
         </div>

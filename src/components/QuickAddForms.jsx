@@ -1,246 +1,267 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-hot-toast";
-import {
-  logFeedingAndConsume as logFeeding,
-  undoFeeding,
-  addInventoryItem,
-  addShoppingItem,
-} from "../services/actions";
+// src/components/QuickAddForms.jsx
+import React, { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { useData } from '../context/DataContext';
 
-// Numeric input helper (mobile-friendly)
-const Numeric = (props) => (
-  <input
-    {...props}
-    inputMode="numeric"
-    pattern="[0-9]*"
-    enterKeyHint="done"
-    className={`input ${props.className || ""}`}
-  />
-);
+/**
+ * Props:
+ * - tab: "Feeding" | "Inventory" | "Shopping"
+ * - onDone: () => void  (called after a successful action)
+ */
+export default function QuickAddForms({ tab = 'Feeding', onDone }) {
+  const {
+    inventory = [],
+    handleLogUsage,            // (item, amount, isTrash)
+    handleAddFood,             // ({ name, cubesLeft, status, madeOn })
+    handleAddShoppingItem,     // (name)  -- prefer this if present
+    handleAddToShoppingList,   // (name)  -- legacy fallback
+  } = useData();
 
-// Local storage keys for defaults
-const LS = {
-  type: "bf_last_feed_type",
-  food: "bf_last_feed_food",
-  qty: "bf_last_feed_qty",
-};
+  // ------- Feeding -------
+  const [feedItemId, setFeedItemId] = useState('');
+  const [feedQty, setFeedQty] = useState(1);
+  const [feedWasted, setFeedWasted] = useState(false);
 
-/* -------------------- Feeding -------------------- */
-function FeedingForm({ onDone }) {
-  // optional: use inventory names for suggestions
-  let invNames = [];
-  try {
-    const { useData } = require("../context/DataContext");
-    const data = useData?.();
-    invNames = (data?.inventory || data?.items || []).map((i) => i.name).filter(Boolean);
-  } catch (_) {}
+  const inStock = useMemo(
+    () => inventory.filter(i => Number(i.cubesLeft || 0) > 0)
+                   .sort((a,b) => (a.name || '').localeCompare(b.name || '')),
+    [inventory]
+  );
 
-  const suggestions = useMemo(() => {
-    const staticOpts = ["Pea purée", "Carrot purée", "Banana mash", "Yogurt", "Oatmeal"];
-    return Array.from(new Set([...(invNames || []), ...staticOpts])).slice(0, 30);
-  }, [invNames]);
+  const selectedFeedItem = useMemo(
+    () => inStock.find(i => i.id === feedItemId) || null,
+    [inStock, feedItemId]
+  );
 
-  const qc = useQueryClient();
+  async function submitFeeding(e) {
+    e.preventDefault();
+    if (!selectedFeedItem) return toast.error('Pick an item to log.');
+    const qty = Math.max(1, Number(feedQty) || 1);
+    if (qty > Number(selectedFeedItem.cubesLeft || 0)) {
+      return toast.error(`Only ${selectedFeedItem.cubesLeft} left.`);
+    }
+    try {
+      await handleLogUsage?.(selectedFeedItem, qty, !!feedWasted);
+      toast.success(feedWasted ? 'Logged as wasted.' : 'Feeding logged!');
+      setFeedQty(1);
+      setFeedItemId('');
+      setFeedWasted(false);
+      onDone?.();
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not log feeding.');
+    }
+  }
 
-  // Defaults from localStorage
-  const [type, setType] = useState(() => localStorage.getItem(LS.type) || "Puree");
-  const [food, setFood] = useState(() => localStorage.getItem(LS.food) || "");
-  const [qty, setQty] = useState(() => Number(localStorage.getItem(LS.qty) || 2));
+  // ------- Inventory -------
+  const [invName, setInvName] = useState('');
+  const [invQty, setInvQty] = useState(6);
+  const [invStatus, setInvStatus] = useState('Frozen'); // Frozen | Fridge | Pantry
+  const todayYMD = new Date().toISOString().slice(0, 10);
+  const [invMadeOn, setInvMadeOn] = useState(todayYMD);
 
-  useEffect(() => localStorage.setItem(LS.type, type), [type]);
-  useEffect(() => localStorage.setItem(LS.food, food), [food]);
-  useEffect(() => localStorage.setItem(LS.qty, String(qty)), [qty]);
+  async function submitInventory(e) {
+    e.preventDefault();
+    const name = (invName || '').trim();
+    const qty = Math.max(0, Number(invQty) || 0);
+    if (!name) return toast.error('Enter a name.');
+    try {
+      await handleAddFood?.({
+        name,
+        cubesLeft: qty,
+        status: invStatus,
+        madeOn: invMadeOn, // yyyy-mm-dd
+      });
+      toast.success('Inventory updated.');
+      setInvName('');
+      setInvQty(6);
+      setInvStatus('Frozen');
+      setInvMadeOn(todayYMD);
+      onDone?.();
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not add inventory.');
+    }
+  }
 
-  const buzz = () => navigator.vibrate && navigator.vibrate(8);
+  // ------- Shopping -------
+  const [shopName, setShopName] = useState('');
 
-  const addFeed = useMutation({
-    mutationFn: (payload) => logFeeding(payload),
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["history"] });
-      qc.invalidateQueries({ queryKey: ["inventory"] }); // in case we consumed
-      const tId = toast((t) => (
-        <div className="text-sm">
-          Feeding logged.
-          <button
-            className="ml-3 underline"
-            onClick={async () => {
-              try {
-                await undoFeeding({
-                  historyId: res?.historyId,
-                  invItemId: res?.invItemId,
-                  amount: res?.amount,
-                });
-                qc.invalidateQueries({ queryKey: ["history"] });
-                qc.invalidateQueries({ queryKey: ["inventory"] });
-                toast.success("Undone");
-              } catch (e) {
-                toast.error(e?.message || "Undo failed");
-              } finally {
-                toast.dismiss(t.id);
-              }
-            }}
-          >
-            Undo
-          </button>
+  async function submitShopping(e) {
+    e.preventDefault();
+    const name = (shopName || '').trim();
+    if (!name) return toast.error('Enter an item name.');
+    try {
+      const add = handleAddShoppingItem || handleAddToShoppingList;
+      if (!add) throw new Error('Shopping add handler not available');
+      await add(name);
+      toast.success('Added to shopping list.');
+      setShopName('');
+      onDone?.();
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not add to shopping list.');
+    }
+  }
+
+  // ------- Render -------
+  if (tab === 'Inventory') {
+    return (
+      <form onSubmit={submitInventory} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold mb-1">Name</label>
+          <input
+            className="input"
+            placeholder="e.g., Peas"
+            value={invName}
+            onChange={(e) => setInvName(e.target.value)}
+            autoFocus
+          />
         </div>
-      ), { duration: 10000 });
-      if (res?.consumed) {
-        toast.success(`Consumed ${res.amount} from ${res.itemName} (left: ${res.newCubesLeft})`);
-      }
-      onDone();
-      buzz();
-    },
-    onError: (e) => toast.error(e?.message || "Failed to log feeding"),
-  });
 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-semibold mb-1">Portions</label>
+            <input
+              className="input"
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              min="0"
+              step="1"
+              value={invQty}
+              onChange={(e) => setInvQty(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold mb-1">Status</label>
+            <select
+              className="input"
+              value={invStatus}
+              onChange={(e) => setInvStatus(e.target.value)}
+            >
+              <option>Frozen</option>
+              <option>Fridge</option>
+              <option>Pantry</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1">Made on</label>
+          <input
+            className="input"
+            type="date"
+            value={invMadeOn}
+            onChange={(e) => setInvMadeOn(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-1">
+          <button type="button" className="btn-outline" onClick={() => onDone?.()}>Cancel</button>
+          <button type="submit" className="btn-primary">Add</button>
+        </div>
+      </form>
+    );
+  }
+
+  if (tab === 'Shopping') {
+    return (
+      <form onSubmit={submitShopping} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold mb-1">Item name</label>
+          <input
+            className="input"
+            placeholder="e.g., Sweet potato"
+            value={shopName}
+            onChange={(e) => setShopName(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-1">
+          <button type="button" className="btn-outline" onClick={() => onDone?.()}>Cancel</button>
+          <button type="submit" className="btn-primary">Add</button>
+        </div>
+      </form>
+    );
+  }
+
+  // Feeding (default)
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        addFeed.mutate({ type, food: food.trim(), qty: Number(qty || 0), when: new Date() });
-      }}
-    >
-      <label className="block mb-1">Type</label>
-      <div className="flex gap-2 mb-3">
-        {["Puree", "Finger Food", "Formula"].map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setType(t)}
-            className={`px-3 py-2 rounded-full border text-sm ${
-              type === t ? "bg-black text-white dark:bg-white dark:text-black" : ""
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+    <form onSubmit={submitFeeding} className="space-y-4">
+      <div>
+        <label className="block text-sm font-semibold mb-1">Item</label>
+        <select
+          className="input"
+          value={feedItemId}
+          onChange={(e) => setFeedItemId(e.target.value)}
+          aria-label="Select item to feed"
+          autoFocus
+        >
+          <option value="">Select…</option>
+          {inStock.map(i => (
+            <option key={i.id} value={i.id}>
+              {i.name} ({i.cubesLeft})
+            </option>
+          ))}
+        </select>
       </div>
 
-      <label className="block mb-1">Food (what was fed)</label>
-      <input
-        list="feeding-food-suggestions"
-        value={food}
-        onChange={(e) => setFood(e.target.value)}
-        className="input mb-3"
-        placeholder="e.g., Pea purée"
-      />
-      <datalist id="feeding-food-suggestions">
-        {suggestions.map((name) => (
-          <option key={name} value={name} />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-semibold mb-1">Portions</label>
+          <input
+            className="input"
+            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            min="1"
+            step="1"
+            value={feedQty}
+            onChange={(e) => setFeedQty(e.target.value)}
+            aria-label="Portions to log"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 mt-6">
+          <input
+            type="checkbox"
+            checked={feedWasted}
+            onChange={(e) => setFeedWasted(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span className="text-sm">Mark as wasted</span>
+        </label>
+      </div>
+
+      <div className="flex gap-2">
+        {[1,2,3].map(n => (
+          <button
+            key={n}
+            type="button"
+            className="pill"
+            onClick={() => setFeedQty(n)}
+            aria-label={`Set portions to ${n}`}
+          >
+            {n}
+          </button>
         ))}
-      </datalist>
+        {selectedFeedItem && (
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setFeedQty(Number(selectedFeedItem.cubesLeft || 1))}
+          >
+            All ({selectedFeedItem.cubesLeft})
+          </button>
+        )}
+      </div>
 
-      <label className="block mb-1">Quantity (cubes/oz)</label>
-      <Numeric value={qty} onChange={(e) => setQty(e.target.value)} className="mb-4" />
-
-      <button className="btn-primary w-full h-12 rounded-xl" disabled={addFeed.isPending}>
-        {addFeed.isPending ? "Saving…" : "Log feeding"}
-      </button>
+      <div className="flex justify-end gap-3 pt-1">
+        <button type="button" className="btn-outline" onClick={() => onDone?.()}>Cancel</button>
+        <button type="submit" className="btn-primary">Log</button>
+      </div>
     </form>
   );
-}
-
-/* -------------------- Inventory -------------------- */
-function InventoryForm({ onDone }) {
-  const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [cubes, setCubes] = useState(6);
-  const [status, setStatus] = useState("Frozen");
-
-  const buzz = () => navigator.vibrate && navigator.vibrate(8);
-
-  const addInv = useMutation({
-    mutationFn: (payload) => addInventoryItem(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["inventory"] });
-      toast.success("Added to inventory");
-      onDone();
-      buzz();
-    },
-    onError: (e) => toast.error(e?.message || "Failed to add"),
-  });
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        addInv.mutate({
-          name: name.trim(),
-          cubesLeft: Number(cubes || 0),
-          status,
-          madeOn: new Date(),
-        });
-      }}
-    >
-      <label className="block mb-1">Item</label>
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="input mb-3"
-        placeholder="Pea purée"
-        enterKeyHint="next"
-      />
-
-      <label className="block mb-1">Portions</label>
-      <Numeric value={cubes} onChange={(e) => setCubes(e.target.value)} className="mb-3" />
-
-      <label className="block mb-1">Status</label>
-      <select value={status} onChange={(e) => setStatus(e.target.value)} className="select mb-4">
-        <option>Frozen</option>
-        <option>Fresh</option>
-      </select>
-
-      <button className="btn-primary w-full h-12 rounded-xl" disabled={addInv.isPending}>
-        {addInv.isPending ? "Saving…" : "Add to inventory"}
-      </button>
-    </form>
-  );
-}
-
-/* -------------------- Shopping -------------------- */
-function ShoppingForm({ onDone }) {
-  const qc = useQueryClient();
-  const [item, setItem] = useState("");
-
-  const buzz = () => navigator.vibrate && navigator.vibrate(8);
-
-  const addShop = useMutation({
-    mutationFn: (payload) => addShoppingItem(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["shoppingList"] });
-      toast.success("Added to shopping list");
-      onDone();
-      buzz();
-    },
-    onError: (e) => toast.error(e?.message || "Failed to add"),
-  });
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        addShop.mutate({ text: item.trim(), done: false, createdAt: new Date() });
-      }}
-    >
-      <label className="block mb-1">Item</label>
-      <input
-        value={item}
-        onChange={(e) => setItem(e.target.value)}
-        className="input mb-3"
-        placeholder="Spinach, yogurt…"
-      />
-
-      <button className="btn-primary w-full h-12 rounded-xl" disabled={addShop.isPending}>
-        {addShop.isPending ? "Saving…" : "Add to list"}
-      </button>
-    </form>
-  );
-}
-
-export default function QuickAddForms({ tab, onDone }) {
-  if (tab === "Feeding") return <FeedingForm onDone={onDone} />;
-  if (tab === "Inventory") return <InventoryForm onDone={onDone} />;
-  return <ShoppingForm onDone={onDone} />;
 }

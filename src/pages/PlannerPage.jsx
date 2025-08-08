@@ -22,12 +22,11 @@ function PlanMealModal({ date, mealType, onClose, onSave }) {
   const [isIngredient, setIsIngredient] = useState(false);
   const [amount, setAmount] = useState(1);
 
-  const canCookRecipe = (recipe) => {
-    return (recipe.ingredients || []).every((ing) => {
+  const canCookRecipe = (recipe) =>
+    (recipe.ingredients || []).every((ing) => {
       const itemInStock = inventory.find((i) => i.id === ing.itemId);
       return itemInStock && Number(itemInStock.cubesLeft || 0) >= Number(ing.cubesRequired || 0);
     });
-  };
 
   const availableItems = (
     isIngredient
@@ -55,15 +54,23 @@ function PlanMealModal({ date, mealType, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 p-4 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Plan ${mealType} for ${format(date, 'MMM d')}`}
+    >
       <div className="card w-full max-w-md p-4">
-        <h3 className="text-xl mb-4">Plan {mealType} for {format(date, 'MMM d')}</h3>
+        <h3 className="text-xl mb-4">
+          Plan {mealType} for {format(date, 'MMM d')}
+        </h3>
 
         <div className="space-y-4">
           <Select
             options={availableItems}
             onChange={(option) => setSelectedItemId(option?.value ?? null)}
             className="flex-grow"
+            classNamePrefix="select"
             placeholder={isIngredient ? 'Select Ingredient…' : 'Select Recipe…'}
             styles={{
               control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.15rem' }),
@@ -95,10 +102,14 @@ function PlanMealModal({ date, mealType, onClose, onSave }) {
               <label className="block text-sm font-bold mb-1">Number of Cubes</label>
               <input
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min="1"
+                step="1"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="input"
+                aria-label="Number of cubes"
               />
             </div>
           )}
@@ -215,7 +226,7 @@ export default function PlannerPage() {
             <p className="font-extrabold text-center">{format(day, 'E')}</p>
             <p className="text-sm text-center -mt-2 mb-2">{format(day, 'd')}</p>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               {mealTypes.map((meal) => {
                 const plannedMeals = (plans || []).filter(
                   (p) =>
@@ -264,7 +275,7 @@ export default function PlannerPage() {
                     <button
                       aria-label="Add planned meal"
                       onClick={() => openModal(day, meal.toLowerCase())}
-                      className="mt-1 text-[var(--accent-light)] w-full flex justify-center pt-1"
+                      className="mt-1 text-[var(--accent-light)] w-full flex justify-center pt-1 min-h-[44px]"
                       title="Add meal"
                     >
                       <PlusCircle size={20} />

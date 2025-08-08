@@ -1,89 +1,82 @@
 // src/components/FeedingHistory.jsx
-import React, { useMemo } from "react";
-import { Trash2 } from "lucide-react";
+import React, { useMemo } from 'react';
+import { format } from 'date-fns';
+import { X } from 'lucide-react';
 
-const toTitleCase = (s = "") =>
-  String(s).trim().replace(/\s+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-
-function formatDayLabel(date) {
-  const d = new Date(date);
-  const today = new Date();
-  const yday = new Date(); yday.setDate(today.getDate() - 1);
-  const sameDay = (a, b) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  if (sameDay(d, today)) return "Today";
-  if (sameDay(d, yday)) return "Yesterday";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function typeChipClasses(t) {
-  const tt = (t || '').toLowerCase();
-  if (tt === 'wasted') return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
-  if (tt === 'eaten' || tt === 'feeding') return "bg-[var(--accent-100)] text-[var(--accent-600)]";
-  if (tt === 'recipe') return "bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-200";
-  return "bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-200";
-}
-
+/**
+ * Props:
+ * - history: Array<{ id, name, amount, type: 'eaten'|'wasted'|'recipe', timestamp: Date }>
+ * - loading: boolean
+ * - onDelete?: (id: string) => void
+ */
 export default function FeedingHistory({ history = [], loading, onDelete }) {
-  const grouped = useMemo(() => {
-    const groups = new Map();
-    (history || []).forEach((h) => {
-      const ts = h.timestamp ? new Date(h.timestamp) : new Date();
-      const key = `${ts.getFullYear()}-${ts.getMonth() + 1}-${ts.getDate()}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(h);
+  const items = useMemo(() => {
+    // Sort newest first (defensive in case context doesn't already)
+    return [...history].sort((a, b) => {
+      const at = new Date(a.timestamp || 0).getTime();
+      const bt = new Date(b.timestamp || 0).getTime();
+      return bt - at;
     });
-    for (const arr of groups.values()) {
-      arr.sort((a, b) => (new Date(b.timestamp) - new Date(a.timestamp)));
-    }
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => (a < b ? 1 : -1))
-      .map(([key, arr]) => {
-        const [y,m,d] = key.split("-").map(Number);
-        const label = formatDayLabel(new Date(y, m - 1, d));
-        return { label, items: arr };
-      });
   }, [history]);
 
-  if (loading) return <div>Loading…</div>;
-  if (!history?.length) return <div className="opacity-70">No history yet.</div>;
+  if (loading) {
+    return <div className="card text-muted">Loading history…</div>;
+  }
+
+  if (!items.length) {
+    return <div className="card text-muted">No feeding history yet.</div>;
+  }
 
   return (
-    <div className="space-y-6">
-      {grouped.map(({ label, items }) => (
-        <div key={label}>
-          <div className="sticky top-0 z-10 sticky-header text-sm font-semibold opacity-80 px-1 py-1">{label}</div>
-          <ul className="divide-y rounded-2xl border surface">
-            {items.map((h) => {
-              const name = toTitleCase(h.name || "");
-              const time = h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-              return (
-                <li key={h.id || name + time} className="flex items-center justify-between p-3">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{name}</div>
-                    <div className="text-xs text-muted flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-full ${typeChipClasses(h.type)}`}>
-                        {h.type || "feeding"}
-                      </span>
-                      <span>{time}</span>
-                      <span className="tabular-nums">{h.amount ?? 0}</span>
-                    </div>
-                  </div>
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(h.id)}
-                      className="p-2 rounded-xl border hover:bg-black/5"
-                      aria-label="Delete entry"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+    <div className="space-y-3">
+      {items.map((row) => {
+        const ts = row.timestamp ? new Date(row.timestamp) : null;
+        const when = ts && !isNaN(ts) ? format(ts, 'MMM d, h:mma') : '—';
+
+        let badgeText = 'Fed';
+        let badgeClass = 'bg-green-100 text-green-700 border-green-200';
+        if (row.type === 'wasted') {
+          badgeText = 'Wasted';
+          badgeClass = 'bg-rose-100 text-rose-700 border-rose-200';
+        } else if (row.type === 'recipe') {
+          badgeText = 'Recipe';
+          badgeClass = 'bg-sky-100 text-sky-700 border-sky-200';
+        }
+
+        return (
+          <div
+            key={row.id}
+            className="card !p-3 flex items-start justify-between gap-3"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`badge border ${badgeClass}`}
+                  aria-label={`Entry type: ${badgeText}`}
+                >
+                  {badgeText}
+                </span>
+                <span className="font-semibold truncate">{row.name}</span>
+                {row.amount != null && (
+                  <span className="text-xs text-muted">({row.amount})</span>
+                )}
+              </div>
+              <div className="text-xs text-muted mt-1">{when}</div>
+            </div>
+
+            {onDelete && (
+              <button
+                aria-label={`Delete ${row.name} entry`}
+                onClick={() => onDelete(row.id)}
+                className="text-slate-400 hover:text-red-500 flex-shrink-0"
+                title="Delete entry"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -132,3 +132,44 @@ a { color: #7c3aed; }
 
 /* Make form controls/UA widgets use dark palette */
 html.dark { color-scheme: dark; }
+/* --- Mobile viewport helpers --- */
+.min-h-dvh { min-height: 100dvh; }  /* use dynamic viewport */
+.h-dvh     { height: 100dvh; }
+.min-h-svh { min-height: 100svh; }  /* small viewport (when bars visible) */
+
+/* Keep layout stable when scrollbars appear (Android 15+) */
+html { scrollbar-gutter: stable; }
+
+/* Reduce accidental pull-to-refresh jank on lists */
+body, main { overscroll-behavior-y: contain; }
+
+/* Bigger tap targets baseline */
+button, .pill, .mobile-nav a { min-height: 44px; }
+
+/* Toast spacing so it doesn't overlap FAB */
+:root { --toast-top-offset: 18px; }
+@media (max-width: 640px) {
+  :root { --toast-top-offset: 8px; }
+}
+
+/* Stronger focus ring (accessibility) */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* react-select dark fix */
+.dark .Select__control, .dark .select__control {
+  background: rgba(2,6,23,0.6);
+  border-color: var(--border-dark);
+  color: #e5e7eb;
+}
+.dark .Select__menu, .dark .select__menu {
+  background: #0b1220;
+  color: #e5e7eb;
+}
+.dark .Select__option--is-focused, .dark .select__option--is-focused {
+  background: rgba(124,58,237,0.18);
+}
+.dark .Select__single-value { color: #e5e7eb; }
