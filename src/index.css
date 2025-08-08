@@ -1,9 +1,11 @@
+@import "@fontsource-variable/inter"; /* variable font (primary) */
+@import "@fontsource/inter/400.css";  /* static fallbacks */
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Self-host Inter, no FOUT/CDN issues */
-@import "@fontsource-variable/inter";
 
 /* ---------- Global font ---------- */
 html, body, #root { height: 100%; }
@@ -12,6 +14,11 @@ body {
     "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
     "Apple Color Emoji", "Segoe UI Emoji";
   overflow-x: hidden;
+
+  /* nicer text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ---------- Theme tokens ---------- */
