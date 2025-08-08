@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-host Inter, no FOUT/CDN issues */
+@import "@fontsource-variable/inter";
+
 /* ---------- Global font ---------- */
 html, body, #root { height: 100%; }
 body {
@@ -26,6 +29,7 @@ body {
   --accent-pink:  #ec4899;
 }
 
+/* subtle gradient backgrounds */
 body {
   background:
     radial-gradient(1200px 600px at 50% -200px, rgba(124,58,237,0.15), transparent 60%),
@@ -61,7 +65,7 @@ body {
 .dark .input, .dark .input-field {
   background: rgba(2,6,23,0.6);
   border: 1px solid var(--border-dark);
-  color: #e5e7eb;                 /* readable in dark */
+  color: #e5e7eb;
 }
 .input::placeholder, .input-field::placeholder { color: var(--text-muted-light); }
 .dark .input::placeholder, .dark .input-field::placeholder { color: #b6c2d1; }
@@ -81,7 +85,6 @@ input[disabled], select[disabled], textarea[disabled] { opacity: .6; cursor: not
 
 .pt-safe { padding-top: env(safe-area-inset-top); }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-
 .main-pad-bottom { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 
 .mobile-nav {
