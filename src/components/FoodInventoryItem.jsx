@@ -1,155 +1,107 @@
-import React, { useState } from 'react';
-import { Save, X, Plus, Minus, Smile, Meh, Frown, AlertCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import React, { useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { usePortions } from "../services/actions";
+import { toast } from "react-hot-toast";
+import { motion } from "framer-motion";
 
-// A simple utility for haptic feedback
-const vibrate = () => {
-    if (window.navigator && window.navigator.vibrate) {
-        window.navigator.vibrate(50); // 50ms vibration
-    }
-};
-
-function StatusSelector({ currentStatus, onSelect }) {
-    const statuses = [
-        { id: 'liked', icon: <Smile size={20} className="text-green-500"/>, label: 'Liked' },
-        { id: 'disliked', icon: <Frown size={20} className="text-orange-500"/>, label: 'Disliked' },
-        { id: 'allergy', icon: <AlertCircle size={20} className="text-red-500"/>, label: 'Allergy Concern' },
-        { id: 'new', icon: <Meh size={20} className="text-slate-500"/>, label: 'Reset to New' },
-    ];
-
-    return (
-        <div className="flex justify-around items-center pt-2 mt-2 border-t border-[var(--border-light)] dark:border-[var(--border-dark)]">
-            {statuses.map(status => (
-                <button 
-                    key={status.id}
-                    onClick={() => {
-                        onSelect(status.id);
-                        vibrate();
-                    }}
-                    className={`p-3 rounded-full transition-colors ${currentStatus === status.id ? 'bg-slate-200 dark:bg-slate-600' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                    aria-label={status.label}
-                    title={status.label}
-                >
-                    {status.icon}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function LogUsageForm({ item, onSave, onCancel }) {
-  const [amountUsed, setAmountUsed] = useState(1);
-  const [isTrash, setIsTrash] = useState(false);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (amountUsed > 0 && amountUsed <= item.cubesLeft) {
-      onSave(item, amountUsed, isTrash);
-      onCancel();
-    } else {
-      toast.error(`Please enter a valid amount between 1 and ${item.cubesLeft}.`);
-    }
-  };
-
-  const handleAmountChange = (delta) => {
-    vibrate();
-    setAmountUsed(prev => {
-        const newValue = prev + delta;
-        if (newValue > 0 && newValue <= item.cubesLeft) {
-            return newValue;
-        }
-        return prev;
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-[var(--border-light)] dark:border-[var(--border-dark)] space-y-4">
-      <div>
-        <label className="block text-xs font-bold text-center text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Cubes Used</label>
-        <div className="flex items-center justify-center gap-4">
-            <button type="button" onClick={() => handleAmountChange(-1)} className="p-4 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                <Minus size={20}/>
-            </button>
-            <span className="text-3xl font-bold w-12 text-center">{amountUsed}</span>
-            <button type="button" onClick={() => handleAmountChange(1)} className="p-4 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                <Plus size={20}/>
-            </button>
-        </div>
-      </div>
-      <div className="flex items-center justify-center gap-2">
-        <input 
-          type="checkbox"
-          id={`isTrash-${item.id}`}
-          checked={isTrash}
-          onChange={(e) => setIsTrash(e.target.checked)}
-          className="h-4 w-4 rounded border-[var(--border-light)] dark:border-[var(--border-dark)] text-[var(--accent-light)] focus:ring-[var(--accent-light)]"
-        />
-        <label htmlFor={`isTrash-${item.id}`} className="text-sm text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]">Mark as wasted</label>
-      </div>
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors"><X size={20}/></button>
-        <button type="submit" className="p-2 text-slate-400 hover:text-green-500 rounded-full transition-colors"><Save size={20}/></button>
-      </div>
-    </form>
-  );
-}
-
+/**
+ * Shows an inventory item with "Use 1" / "Use N" controls.
+ * - Disables use when cubesLeft <= 0
+ * - Tiny pulse animation on decrement
+ * - If parent passes onLogUsage/onUpdateStatus (DataContext), we call those too.
+ */
 export default function FoodInventoryItem({ item, onLogUsage, onUpdateStatus }) {
-  const [isLogging, setIsLogging] = useState(false);
+  const [n, setN] = useState(2);
+  const [localLeft, setLocalLeft] = useState(Number(item.cubesLeft || 0));
+  const prevLeftRef = useRef(localLeft);
 
-  const badgeColorClass = item.hasShortfall
-    ? 'text-red-800 bg-red-100 dark:bg-red-900/50 dark:text-red-300'
-    : 'text-amber-800 bg-amber-100 dark:bg-amber-900/50 dark:text-amber-300';
-    
-  const statusIcon = {
-      'liked': <Smile size={16} className="text-green-500"/>,
-      'disliked': <Frown size={16} className="text-orange-500"/>,
-      'allergy': <AlertCircle size={16} className="text-red-500"/>,
-      'new': <Meh size={16} className="text-slate-500"/>,
-  }[item.status || 'new'];
+  useEffect(() => {
+    setLocalLeft(Number(item.cubesLeft || 0));
+  }, [item.cubesLeft]);
+
+  const mut = useMutation({
+    mutationFn: async (qty) => {
+      if (onLogUsage) {
+        // Update via parent handler (keeps your DataContext in sync)
+        const next = Math.max(0, Number(item.cubesLeft || 0) - Number(qty || 0));
+        await onLogUsage({ id: item.id, name: item.name }, next, Number(qty || 0), false);
+      } else {
+        // Fallback: hit Firestore directly
+        await usePortions(item.id, qty);
+      }
+    },
+    onMutate: (qty) => {
+      // optimistic local pulse
+      prevLeftRef.current = localLeft;
+      setLocalLeft((v) => Math.max(0, Number(v || 0) - Number(qty || 0)));
+      navigator.vibrate && navigator.vibrate(8);
+    },
+    onError: () => {
+      setLocalLeft(prevLeftRef.current);
+      toast.error("Couldn’t update item");
+    },
+    onSuccess: () => {
+      toast.success("Updated");
+    },
+  });
+
+  const disabled = localLeft <= 0 || mut.isPending;
+  const useOne = () => !disabled && mut.mutate(1);
+  const useN = (e) => {
+    e.preventDefault();
+    const qty = Math.max(1, Number(n || 0));
+    if (!disabled) mut.mutate(qty);
+  };
 
   return (
-    <motion.div
-        layout
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.3 }}
-        className="card flex flex-col justify-between"
-    >
-      <div>
-        <div className="flex justify-between items-start">
-            <h3 className="text-2xl font-bold flex items-center gap-2">{statusIcon} {item.name}</h3>
-            <div className="text-right flex-shrink-0 ml-4">
-                <p className="text-5xl font-extrabold text-[var(--accent-light)] dark:text-[var(--accent-dark)] leading-none">{item.cubesLeft}</p>
-                <p className="text-xs text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] -mt-1">CUBES</p>
-            </div>
-        </div>
-        
-        {item.reserved > 0 && (
-            <div className={`text-xs font-bold px-2 py-1 rounded-full mt-2 text-center w-fit ${badgeColorClass}`}>
-                {item.reserved} reserved in planner
-            </div>
-        )}
+    <div className="p-4 rounded-2xl border bg-white/70 dark:bg-[#1f2937]/50 flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <div className="font-semibold truncate">{item.name}</div>
+        <div className="text-xs opacity-70">{item.status || "—"}</div>
       </div>
 
-      <div className="mt-4">
-        {isLogging ? (
-          <LogUsageForm item={item} onSave={onLogUsage} onCancel={() => setIsLogging(false)} />
-        ) : (
-          <>
-            <StatusSelector currentStatus={item.status} onSelect={(status) => onUpdateStatus(item.id, status)} />
-            <button 
-              onClick={() => setIsLogging(true)} 
-              disabled={item.cubesLeft === 0} 
-              className="btn-primary w-full text-sm !py-2 mt-2 disabled:bg-slate-200 dark:disabled:bg-slate-700"
-            >
-              Feed!
-            </button>
-          </>
-        )}
+      <div className="flex items-center gap-3">
+        <motion.span
+          key={localLeft} // re-trigger animation when number changes
+          initial={{ scale: 1.0 }}
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 0.25 }}
+          className="text-lg tabular-nums w-10 text-right"
+        >
+          {localLeft}
+        </motion.span>
+
+        <button
+          onClick={useOne}
+          disabled={disabled}
+          className={`h-10 px-3 rounded-xl border active:scale-[0.98] ${
+            disabled ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          aria-label={`Use 1 from ${item.name}`}
+        >
+          Use 1
+        </button>
+
+        <form onSubmit={useN} className="flex items-center gap-2">
+          <input
+            value={n}
+            onChange={(e) => setN(e.target.value)}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="h-10 w-16 rounded-xl border px-2 text-center"
+            aria-label="Quantity to use"
+          />
+          <button
+            type="submit"
+            disabled={disabled}
+            className={`h-10 px-3 rounded-xl border active:scale-[0.98] ${
+              disabled ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            Use N
+          </button>
+        </form>
       </div>
-    </motion.div>
+    </div>
   );
 }

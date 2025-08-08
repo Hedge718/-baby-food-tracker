@@ -1,100 +1,89 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { Apple, Trash2, X, Utensils, Download } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Papa from 'papaparse';
+// src/components/FeedingHistory.jsx
+import React, { useMemo } from "react";
+import { Trash2 } from "lucide-react";
 
-export default function FeedingHistory({ history, loading, onDelete }) {
-    const [showAll, setShowAll] = useState(false);
-    
-    if (loading) {
-        return <div className="card"><p className="text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]">Loading...</p></div>;
+const toTitleCase = (s = "") =>
+  String(s).trim().replace(/\s+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+function formatDayLabel(date) {
+  const d = new Date(date);
+  const today = new Date();
+  const yday = new Date(); yday.setDate(today.getDate() - 1);
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yday)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function typeChipClasses(t) {
+  const tt = (t || '').toLowerCase();
+  if (tt === 'wasted') return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200";
+  if (tt === 'eaten' || tt === 'feeding') return "bg-[var(--accent-100)] text-[var(--accent-600)]";
+  if (tt === 'recipe') return "bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-200";
+  return "bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-200";
+}
+
+export default function FeedingHistory({ history = [], loading, onDelete }) {
+  const grouped = useMemo(() => {
+    const groups = new Map();
+    (history || []).forEach((h) => {
+      const ts = h.timestamp ? new Date(h.timestamp) : new Date();
+      const key = `${ts.getFullYear()}-${ts.getMonth() + 1}-${ts.getDate()}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(h);
+    });
+    for (const arr of groups.values()) {
+      arr.sort((a, b) => (new Date(b.timestamp) - new Date(a.timestamp)));
     }
-    
-    const displayedHistory = showAll ? (history || []) : (history || []).slice(0, 5);
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => (a < b ? 1 : -1))
+      .map(([key, arr]) => {
+        const [y,m,d] = key.split("-").map(Number);
+        const label = formatDayLabel(new Date(y, m - 1, d));
+        return { label, items: arr };
+      });
+  }, [history]);
 
-    const getIcon = (type) => {
-        switch(type) {
-            case 'eaten': return <Apple className="text-green-500" size={20} />;
-            case 'wasted': return <Trash2 className="text-red-500" size={20} />;
-            case 'recipe': return <Utensils className="text-blue-500" size={20} />;
-            default: return <Apple className="text-green-500" size={20} />;
-        }
-    };
+  if (loading) return <div>Loading…</div>;
+  if (!history?.length) return <div className="opacity-70">No history yet.</div>;
 
-    const handleExport = () => {
-        const dataToExport = history.map(item => ({
-            Date: format(new Date(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
-            Food: item.name,
-            Amount: item.amount,
-            Type: item.type,
-        }));
-        const csv = Papa.unparse(dataToExport);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", "feeding_history.csv");
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    return (
-        <div className="card">
-            {(history && history.length > 0) ? (
-                <>
-                    <div className="flex justify-end mb-4 -mt-2">
-                        <button onClick={handleExport} className="btn-secondary !py-1 !px-2 text-xs">
-                            <Download size={14} />
-                            Export
-                        </button>
+  return (
+    <div className="space-y-6">
+      {grouped.map(({ label, items }) => (
+        <div key={label}>
+          <div className="sticky top-0 z-10 sticky-header text-sm font-semibold opacity-80 px-1 py-1">{label}</div>
+          <ul className="divide-y rounded-2xl border surface">
+            {items.map((h) => {
+              const name = toTitleCase(h.name || "");
+              const time = h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+              return (
+                <li key={h.id || name + time} className="flex items-center justify-between p-3">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{name}</div>
+                    <div className="text-xs text-muted flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full ${typeChipClasses(h.type)}`}>
+                        {h.type || "feeding"}
+                      </span>
+                      <span>{time}</span>
+                      <span className="tabular-nums">{h.amount ?? 0}</span>
                     </div>
-                    <ul className="space-y-3">
-                        <AnimatePresence initial={false}>
-                            {displayedHistory.map(h => (
-                                <motion.li
-                                    key={h.id}
-                                    layout
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="p-3 bg-slate-50 dark:bg-slate-900/70 rounded-xl flex justify-between items-center group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        {getIcon(h.type)}
-                                        <div>
-                                            <span className="font-bold">{h.name}</span>
-                                            {h.type !== 'recipe' && (
-                                                <span className="text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]"> — {h.amount} cubes {h.type}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]">
-                                            {h.timestamp ? format(new Date(h.timestamp), 'MMM d, h:mm a') : 'Just now'}
-                                        </span>
-                                        <button onClick={() => onDelete(h.id)} className="text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all" aria-label="Delete history item">
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                </motion.li>
-                            ))}
-                        </AnimatePresence>
-                    </ul>
-                    {history.length > 5 && (
-                        <div className="text-center mt-4 pt-4 border-t border-[var(--border-light)] dark:border-[var(--border-dark)]">
-                            <button onClick={() => setShowAll(!showAll)} className="font-bold text-sm text-[var(--accent-light)] dark:text-[var(--accent-dark)] hover:underline">
-                                {showAll ? 'Show Less' : `Show All ${history.length} Events`}
-                            </button>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <p className="text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] text-center py-4">No events recorded yet.</p>
-            )}
+                  </div>
+                  {onDelete && (
+                    <button
+                      onClick={() => onDelete(h.id)}
+                      className="p-2 rounded-xl border hover:bg-black/5"
+                      aria-label="Delete entry"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
-    );
+      ))}
+    </div>
+  );
 }

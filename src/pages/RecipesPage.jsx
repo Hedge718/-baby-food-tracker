@@ -3,6 +3,7 @@ import { useData } from '../context/DataContext';
 import RecipeForm from '../components/RecipeForm';
 import RecipeList from '../components/RecipeList';
 import { Inbox } from 'lucide-react';
+import PageHeader from "../components/PageHeader";
 
 const EmptyState = ({ message, details }) => (
     <div className="text-center p-8 col-span-full">
@@ -17,12 +18,10 @@ export default function RecipesPage() {
     
     return (
         <div className="space-y-10">
-            <section>
-                <h2 className="text-4xl">Recipes</h2>
-                <p className="text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mt-1">
-                    Create recipes from your inventory and see what you can cook.
-                </p>
-            </section>
+            <PageHeader
+  title="Recipes"
+  subtitle="Create and reuse baby-friendly recipes built from your inventory."
+/>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-1">
                     <RecipeForm onAddRecipe={handleAddRecipe} />

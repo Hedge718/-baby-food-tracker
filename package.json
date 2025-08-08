@@ -4,15 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "server": "node --env-file=.env.local server/index.js",
+    "client": "vite",
+    "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm:server\" \"npm:client\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node --env-file=.env.local server/index.js",
+    "test": "vitest run",
+    "test:ui": "vitest"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.84.1",
+    "cors": "^2.8.5",
     "date-fns": "^2.30.0",
+    "express": "^5.1.0",
     "firebase": "^9.23.0",
     "framer-motion": "^12.23.5",
     "lucide-react": "^0.309.0",
+    "openai": "^5.12.1",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -22,12 +31,14 @@
     "react-swipeable": "^7.0.2",
     "recharts": "^3.1.0"
   },
-  "devDependencies": {
+   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
+    "concurrently": "^9.2.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "vite": "^5.0.10",
-    "vite-plugin-pwa": "^1.0.1"
+    "vite-plugin-pwa": "^1.0.1",
+    "vitest": "^2.0.5"
   }
 }

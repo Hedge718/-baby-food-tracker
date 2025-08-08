@@ -2,51 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  -webkit-tap-highlight-color: transparent;
-  font-family: 'Nunito', sans-serif;
+/* ==== Theme tokens ==== */
+:root{
+  --bg:#0b1220;           /* inky blue-black */
+  --surface:#111827;      /* slate-800-ish */
+  --surface-2:#0f172a;    /* slate-900-ish */
+  --text:#e5e7eb;         /* gray-200 */
+  --text-muted:#9ca3af;   /* gray-400 */
+  --border:#334155;       /* slate-700 */
+
+  --accent-100:#2f2240;
+  --accent-500:#a78bfa;
+  --accent-600:#8b5cf6;
+
+  --success:#22c55e;
+  --warning:#f59e0b;
+  --danger:#ef4444;
+
+  --shadow-1: 0 10px 30px rgba(0,0,0,.35);
+  --shadow-2: 0 6px 20px rgba(0,0,0,.25);
+
+  --brand-grad: linear-gradient(135deg, var(--accent-600) 0%, var(--accent-500) 100%);
 }
 
-/* --- Color Palette Definition --- */
-:root {
-  /* Light Mode */
-  --bg-light: #F8F9FA;
-  --card-light: #FFFFFF;
-  --text-primary-light: #212529;
-  --text-secondary-light: #6C757D;
-  --accent-light: #A082B9;
-  --border-light: #E9ECEF;
+:root.light, :root:not(.dark){
+  --bg:#f7f7fb;
+  --surface:#ffffff;
+  --surface-2:#f8f9fb;
+  --text:#111827;
+  --text-muted:#6b7280;
+  --border:#e5e7eb;
 
-  /* Dark Mode */
-  --bg-dark: #1A1A1A;
-  --card-dark: #2C2C2E;
-  --text-primary-dark: #F8F9FA;
-  --text-secondary-dark: #A0AEC0;
-  --accent-dark: #C1A9D4;
-  --border-dark: #3E3E40;
+  --accent-100:#f0eafe;
+  --accent-500:#9a7bc5;
+  --accent-600:#7c5aa3;
+
+  --shadow-1: 0 12px 30px rgba(16,24,40,.08);
+  --shadow-2: 0 8px 20px rgba(16,24,40,.06);
 }
 
-body {
-  @apply bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] text-[var(--text-primary-light)] dark:text-[var(--text-primary-dark)] transition-colors duration-300;
+/* Base */
+html,body,#root{height:100%}
+body{background:var(--bg);color:var(--text)}
+
+/* Subtle background glow */
+body::before{
+  content:""; position:fixed; inset:-10%;
+  pointer-events:none; z-index:-1;
+  background:
+    radial-gradient(40% 35% at 10% 0%, rgba(167,139,250,.20) 0%, rgba(167,139,250,0) 100%),
+    radial-gradient(35% 35% at 90% 10%, rgba(124,92,246,.18) 0%, rgba(124,92,246,0) 100%);
+  filter: blur(10px);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  @apply font-extrabold;
+/* Helpers */
+.bg-app{background:var(--bg)}
+.surface{background:var(--surface)}
+.surface-2{background:var(--surface-2)}
+.text-muted{color:var(--text-muted)}
+.border-app{border-color:var(--border)}
+
+/* Pretty cards */
+.card{
+  border:1px solid var(--border);
+  border-radius:16px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  box-shadow: var(--shadow-1);
+}
+.card-soft{
+  border:1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius:16px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  box-shadow: var(--shadow-2);
 }
 
-/* --- Component Styles --- */
-.card {
-  @apply bg-[var(--card-light)] dark:bg-[var(--card-dark)] p-5 rounded-2xl shadow-sm border border-[var(--border-light)] dark:border-[var(--border-dark)] transition-colors duration-300;
+/* Buttons */
+.btn-primary{
+  @apply inline-flex items-center justify-center rounded-xl px-4 h-11 font-medium transition;
+  background-image: var(--brand-grad);
+  color:#fff;
+}
+.btn-primary:hover{transform: translateY(-1px); filter: saturate(1.1)}
+.btn-primary:active{transform: translateY(0)}
+.btn-primary:disabled{opacity:.6; cursor:not-allowed}
+
+.btn-outline{
+  @apply inline-flex items-center justify-center rounded-xl px-4 h-11 font-medium transition border;
+  border-color:var(--border); background:transparent; color:var(--text);
+}
+.btn-outline:hover{background:rgba(255,255,255,.04)}
+
+/* Inputs */
+.input,.select,.textarea{
+  @apply w-full h-11 px-3 rounded-xl transition;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--text);
+}
+.input:focus,.select:focus,.textarea:focus{
+  outline:2px solid color-mix(in srgb, var(--accent-500) 55%, transparent);
+  outline-offset:2px;
 }
 
-.btn-primary {
-  @apply flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--accent-light)] dark:bg-[var(--accent-dark)] text-white dark:text-slate-800 font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[var(--accent-light)] dark:focus:ring-[var(--accent-dark)] transition-all duration-200;
+/* Pills & chips */
+.pill{
+  display:inline-flex; align-items:center; gap:.4rem;
+  height:36px; padding:0 .85rem; border-radius:999px;
+  border:1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(6px);
+}
+.pill.is-active{
+  background: color-mix(in srgb, var(--accent-100) 45%, var(--surface) 55%);
+  border-color: color-mix(in srgb, var(--accent-500) 60%, var(--border));
+  color: var(--text);
 }
 
-.btn-secondary {
-    @apply flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 active:scale-[0.98] transition-all duration-200;
+/* Gradient title text */
+.grad-title{
+  background-image: var(--brand-grad);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 
-.input-field {
-  @apply w-full p-2.5 border border-[var(--border-light)] dark:border-[var(--border-dark)] rounded-xl bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-[var(--accent-light)] dark:focus:ring-[var(--accent-dark)] focus:border-transparent transition-colors duration-200;
+/* Age badge colors used across components */
+.badge{
+  font-size:12px; padding:.2rem .5rem; border-radius:999px;
 }
+.badge-ok{ background:rgba(148,163,184,.25); color:#cbd5e1 }           /* slate */
+.badge-warn{ background:rgba(245,158,11,.18); color:#fbbf24 }          /* amber */
+.badge-danger{ background:rgba(239,68,68,.18); color:#f87171 }         /* red */
