@@ -4,29 +4,25 @@
 
 /* ---------- Theme tokens ---------- */
 :root {
-  --bg-light: #f8fafc;           /* slate-50 */
-  --bg-dark:  #0f172a;           /* slate-900 */
+  --bg-light: #f8fafc;            /* slate-50 */
+  --bg-dark:  #0f172a;            /* slate-900 */
   --card-light: #ffffff;
   --card-dark: rgba(2,6,23,0.6);  /* slate-950/60 */
-  --border-light: #e2e8f0;       /* slate-200 */
-  --border-dark:  #1f2937;       /* slate-800 */
-  --text-muted-light: #64748b;   /* slate-500 -> slightly brighter */
-  --text-muted-dark:  #94a3b8;   /* slate-400 -> brighter for contrast */
-  --accent-light: #7c3aed;       /* violet-600 */
-  --accent-dark:  #c084fc;       /* violet-300 */
-  --accent-pink:  #ec4899;       /* rose-500 */
+  --border-light: #e2e8f0;        /* slate-200 */
+  --border-dark:  #1f2937;        /* slate-800 */
+  --text-muted-light: #64748b;    /* slate-500 */
+  --text-muted-dark:  #94a3b8;    /* slate-400 */
+  --accent-light: #7c3aed;        /* violet-600 */
+  --accent-dark:  #c084fc;        /* violet-300 */
+  --accent-pink:  #ec4899;        /* rose-500 */
 }
 
-/* ---------- App base ---------- */
-html, body, #root {
-  height: 100%;
-  background: var(--bg-light);
-}
-:root.dark, .dark :root, .dark body {
-  background: var(--bg-dark);
-}
+/* ---------- Base ---------- */
+html, body, #root { height: 100%; }
+body { overflow-x: hidden; background: var(--bg-light); }
+.dark body { background: var(--bg-dark); }
 
-/* Gradient backdrop (subtle, less muddy) */
+/* subtle gradient */
 body {
   background:
     radial-gradient(1200px 600px at 50% -200px, rgba(124,58,237,0.15), transparent 60%),
@@ -37,6 +33,9 @@ body {
     radial-gradient(1200px 600px at 50% -200px, rgba(124,58,237,0.18), transparent 60%),
     var(--bg-dark);
 }
+
+/* Prevent flex children from forcing horizontal scroll */
+* { min-width: 0; }
 
 .text-muted { color: var(--text-muted-light); }
 .dark .text-muted { color: var(--text-muted-dark); }
@@ -51,20 +50,22 @@ body {
   background: var(--card-dark);
   border: 1px solid var(--border-dark);
 }
-
 .input, .input-field {
   @apply w-full rounded-xl px-4 py-2 outline-none;
   background: rgba(255,255,255,0.9);
   border: 1px solid var(--border-light);
+  color: #0f172a;
 }
 .dark .input, .dark .input-field {
   background: rgba(2,6,23,0.6);
   border: 1px solid var(--border-dark);
+  color: #e5e7eb; /* readable in dark */
 }
 .input::placeholder, .input-field::placeholder { color: var(--text-muted-light); }
-.dark .input::placeholder, .dark .input-field::placeholder { color: var(--text-muted-dark); }
+.dark .input::placeholder, .dark .input-field::placeholder { color: #b6c2d1; }
+input[disabled], select[disabled], textarea[disabled] { opacity: .6; cursor: not-allowed; }
 
-/* Pills / small buttons */
+/* Pills */
 .pill {
   @apply inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium;
   background: rgba(124,58,237,0.10);
@@ -81,7 +82,7 @@ body {
 .pt-safe { padding-top: env(safe-area-inset-top); }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Give main content enough room above the bottom nav */
+/* Main content padding so it never hides behind the bottom nav */
 .main-pad-bottom { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 
 /* ---------- Bottom nav ---------- */
@@ -92,22 +93,20 @@ body {
   height: 58px;
   padding-bottom: env(safe-area-inset-bottom);
   backdrop-filter: blur(8px);
+  z-index: 30;
 }
 .dark .mobile-nav {
   background: rgba(17,24,39,0.95);
   border-color: var(--border-dark);
 }
-
-/* Hide labels on very small phones */
-@media (max-width: 360px) {
-  .nav-label { display: none; }
-}
+/* hide labels on very small phones */
+@media (max-width: 360px) { .nav-label { display: none; } }
 
 /* ---------- FAB ---------- */
 .fab {
   position: fixed;
   right: 16px;
-  bottom: calc(72px + env(safe-area-inset-bottom) + 12px); /* sit above nav */
+  bottom: calc(84px + env(safe-area-inset-bottom) + 20px); /* above nav + extra gap */
   z-index: 40;
 }
 .fab button {
@@ -116,15 +115,12 @@ body {
 }
 
 /* ---------- Utilities ---------- */
-.clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.badge {
-  @apply text-[11px] font-semibold px-2 py-0.5 rounded-full;
-  background: rgba(148,163,184,.2);
-  color: var(--text-muted-light);
-}
+.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.badge { @apply text-[11px] font-semibold px-2 py-0.5 rounded-full; background: rgba(148,163,184,.2); color: var(--text-muted-light); }
 .dark .badge { color: var(--text-muted-dark); background: rgba(148,163,184,.18); }
+
+/* Limit page width so nothing feels “too wide” on mobile */
+.page-wrap { max-width: 800px; margin: 0 auto; }
+
+/* Recharts in dark */
+.dark .recharts-text, .dark .recharts-legend-item-text { fill: #cbd5e1 !important; }
