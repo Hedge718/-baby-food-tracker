@@ -1,14 +1,18 @@
-import React from "react";
-import { Plus } from "lucide-react";
+// src/components/FAB.jsx
+import React from 'react';
+import { Plus } from 'lucide-react';
 
 export default function FAB({ onClick }) {
   return (
     <button
+      aria-label="Quick add"
       onClick={onClick}
-      aria-label="Quick Add"
-      className="fixed bottom-[88px] right-4 h-14 w-14 rounded-full shadow-xl bg-black text-white grid place-items-center z-50 active:scale-[0.98]"
+      className="rounded-full w-14 h-14 flex items-center justify-center text-white shadow-xl focus:outline-none focus:ring-4 focus:ring-violet-400/40"
+      style={{
+        background: 'linear-gradient(180deg, #a78bfa, #7c3aed)'
+      }}
     >
-      <Plus />
+      <Plus size={22} />
     </button>
   );
 }

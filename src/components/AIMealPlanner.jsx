@@ -226,7 +226,7 @@ export default function AIMealPlanner() {
           <input className="input" type="number" min="1" max="8" value={cubesPerMeal} onChange={(e)=>setCubesPerMeal(e.target.value)}/>
         </label>
         <label className="space-y-1 col-span-2">
-          <span className="text-sm text-muted">Max ingredients per meal</span>
+          <span className="text-sm text-muted">Ingredients per meal (exact)</span>
           <input className="input" type="number" min="1" max="5" value={ingredientsPerMeal} onChange={(e)=>setIngredientsPerMeal(e.target.value)}/>
         </label>
         <label className="col-span-2 sm:col-span-6 space-y-1">

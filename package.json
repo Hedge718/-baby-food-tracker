@@ -6,7 +6,7 @@
   "scripts": {
     "server": "node --env-file=.env.local server/index.js",
     "client": "vite",
-    "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm:server\" \"npm:client\"",
+    "dev": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node --env-file=.env.local server/index.js",
