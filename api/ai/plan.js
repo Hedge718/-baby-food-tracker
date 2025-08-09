@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // ---- parse JSON body (Node, not Next) ----
+  // Parse JSON body (Node, not Next)
   let body = {};
   try {
     const chunks = [];
@@ -74,31 +74,18 @@ Return exactly one JSON object matching the schema.
   try {
     const openai = new OpenAI({ apiKey });
 
-    // ✅ Responses API: text.format must be an OBJECT like { type: 'json' }
+    // ✅ Responses API: request a JSON object
     const rsp = await openai.responses.create({
       model: 'gpt-4o-mini',
       temperature: 0.2,
-      text: { format: { type: 'json' } },
+      text: { format: 'json_object' }, // <-- correct enum
       input: [
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(user) },
       ],
     });
 
-    // Try helpers first
-    let text =
-      rsp.output_text ??
-      rsp.content?.[0]?.text ??
-      rsp.choices?.[0]?.message?.content ??
-      '';
-
-    // Some SDK builds put it under output -> content parts
-    if (!text && Array.isArray(rsp.output)) {
-      const parts = rsp.output[0]?.content || [];
-      const textPart = parts.find((p) => p.type === 'output_text');
-      if (textPart?.text) text = textPart.text;
-    }
-
+    const text = getResponseText(rsp);
     const json = safeParseJson(text);
 
     if (!json || !Array.isArray(json.days)) {
@@ -112,22 +99,42 @@ Return exactly one JSON object matching the schema.
   }
 }
 
-/** Robustly extract JSON if fences/extra text sneak in (belt & suspenders) */
+/** Grab text from Responses API regardless of SDK shape */
+function getResponseText(rsp) {
+  if (rsp?.output_text) return rsp.output_text;
+
+  // Some SDK versions expose `output` blocks with `content[]`
+  if (Array.isArray(rsp?.output)) {
+    for (const block of rsp.output) {
+      if (Array.isArray(block?.content)) {
+        for (const c of block.content) {
+          if (typeof c?.text === 'string') return c.text;
+          if (c?.type === 'output_text' && typeof c?.text === 'string') return c.text;
+        }
+      }
+    }
+  }
+
+  // Older shapes / fallbacks
+  if (rsp?.content?.[0]?.text) return rsp.content[0].text;
+  if (rsp?.choices?.[0]?.message?.content) return rsp.choices[0].message.content;
+
+  return '';
+}
+
+/** Parse JSON, stripping fences/junk if necessary (belt & suspenders) */
 function safeParseJson(text) {
   if (!text) throw new Error('Empty model response');
 
-  // 1) direct parse
   try {
     return JSON.parse(text);
   } catch {}
 
-  // 2) fenced block ```json ... ```
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fence?.[1]) {
     try { return JSON.parse(fence[1].trim()); } catch {}
   }
 
-  // 3) slice first { to last }
   const first = text.indexOf('{');
   const last = text.lastIndexOf('}');
   if (first !== -1 && last > first) {
