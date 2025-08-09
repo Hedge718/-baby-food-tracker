@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // ---- parse JSON body (Node, not Next) ----
+  // Parse JSON body (Node, not Next)
   let body = {};
   try {
     const chunks = [];
@@ -74,26 +74,27 @@ Return exactly one JSON object matching the schema.
   try {
     const openai = new OpenAI({ apiKey });
 
-    // Enforce JSON output at the API level
+    // ✅ Responses API: use text.format instead of response_format
     const rsp = await openai.responses.create({
       model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
+      text: { format: 'json' }, // <— THIS is the new way
       input: [
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(user) },
       ],
     });
 
-    // Try the SDK helpers first
+    // Try SDK helper first
     let text =
       rsp.output_text ??
       rsp.content?.[0]?.text ??
       rsp.choices?.[0]?.message?.content ??
       '';
 
-    // Some SDK versions return the JSON object parts in content; normalize
-    if (!text && rsp.output?.[0]?.content?.[0]?.type === 'output_text') {
-      text = rsp.output[0].content[0].text || '';
+    // Some SDK versions store text in output content parts
+    if (!text && Array.isArray(rsp.output)) {
+      const part = rsp.output[0]?.content?.find?.(c => c.type === 'output_text');
+      if (part?.text) text = part.text;
     }
 
     const json = safeParseJson(text);
@@ -109,9 +110,7 @@ Return exactly one JSON object matching the schema.
   }
 }
 
-/**
- * Robustly extract JSON when models wrap in fences or add extra text
- */
+/** Robustly extract JSON if fences/extra text sneak in */
 function safeParseJson(text) {
   if (!text) throw new Error('Empty model response');
 
@@ -122,25 +121,15 @@ function safeParseJson(text) {
 
   // 2) fenced code block ```json ... ```
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fence && fence[1]) {
-    const inner = fence[1].trim();
-    try {
-      return JSON.parse(inner);
-    } catch {
-      // fallthrough
-    }
+  if (fence?.[1]) {
+    try { return JSON.parse(fence[1].trim()); } catch {}
   }
 
-  // 3) slice from first { to last } (drop any trailing junk/backticks)
+  // 3) slice first { to last }
   const first = text.indexOf('{');
   const last = text.lastIndexOf('}');
-  if (first !== -1 && last !== -1 && last > first) {
-    const sliced = text.slice(first, last + 1);
-    try {
-      return JSON.parse(sliced);
-    } catch {
-      // fallthrough
-    }
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(text.slice(first, last + 1)); } catch {}
   }
 
   throw new Error('Model did not return JSON');
