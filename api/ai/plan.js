@@ -12,12 +12,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Parse JSON body (Node, not Next)
+  // Parse JSON body
   let body = {};
   try {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const raw = Buffer.concat(chunks).toString('utf8');
+    const buffers = [];
+    for await (const chunk of req) buffers.push(chunk);
+    const raw = Buffer.concat(buffers).toString('utf8');
     body = raw ? JSON.parse(raw) : {};
   } catch {
     return res.status(400).json({ error: 'Invalid JSON body' });
@@ -31,8 +31,7 @@ export default async function handler(req, res) {
     inventory = [],
   } = body;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY on server' });
   }
 
@@ -72,74 +71,51 @@ Return exactly one JSON object matching the schema.
   };
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    // ✅ Responses API: request a JSON object
-    const rsp = await openai.responses.create({
+    // ✅ Use Chat Completions with JSON mode for guaranteed JSON text
+    const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
       temperature: 0.2,
-      text: { format: 'json_object' }, // <-- correct enum
-      input: [
+      messages: [
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(user) },
       ],
     });
 
-    const text = getResponseText(rsp);
-    const json = safeParseJson(text);
+    const text = completion?.choices?.[0]?.message?.content || '';
+    const plan = safeParseJson(text);
 
-    if (!json || !Array.isArray(json.days)) {
+    if (!plan || !Array.isArray(plan.days)) {
       return res.status(502).json({ error: 'Bad AI response shape', raw: text });
     }
 
-    return res.status(200).json(json);
+    // Optional guard: enforce inventory-only items
+    if (onlyInventory) {
+      const invSet = new Set(inventory.map(i => String(i.name || '').toLowerCase()));
+      for (const d of plan.days || []) {
+        for (const meal of d.meals || []) {
+          meal.items = (meal.items || []).filter(it =>
+            invSet.has(String(it.name || '').toLowerCase())
+          );
+        }
+      }
+    }
+
+    return res.status(200).json(plan);
   } catch (err) {
     console.error('AI plan error:', err);
     return res.status(500).json({ error: err?.message || 'Server error' });
   }
 }
 
-/** Grab text from Responses API regardless of SDK shape */
-function getResponseText(rsp) {
-  if (rsp?.output_text) return rsp.output_text;
-
-  // Some SDK versions expose `output` blocks with `content[]`
-  if (Array.isArray(rsp?.output)) {
-    for (const block of rsp.output) {
-      if (Array.isArray(block?.content)) {
-        for (const c of block.content) {
-          if (typeof c?.text === 'string') return c.text;
-          if (c?.type === 'output_text' && typeof c?.text === 'string') return c.text;
-        }
-      }
-    }
-  }
-
-  // Older shapes / fallbacks
-  if (rsp?.content?.[0]?.text) return rsp.content[0].text;
-  if (rsp?.choices?.[0]?.message?.content) return rsp.choices[0].message.content;
-
-  return '';
-}
-
-/** Parse JSON, stripping fences/junk if necessary (belt & suspenders) */
 function safeParseJson(text) {
   if (!text) throw new Error('Empty model response');
-
-  try {
-    return JSON.parse(text);
-  } catch {}
-
+  try { return JSON.parse(text); } catch {}
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fence?.[1]) {
-    try { return JSON.parse(fence[1].trim()); } catch {}
-  }
-
-  const first = text.indexOf('{');
-  const last = text.lastIndexOf('}');
-  if (first !== -1 && last > first) {
-    try { return JSON.parse(text.slice(first, last + 1)); } catch {}
-  }
-
+  if (fence?.[1]) { try { return JSON.parse(fence[1].trim()); } catch {} }
+  const first = text.indexOf('{'); const last = text.lastIndexOf('}');
+  if (first !== -1 && last > first) { try { return JSON.parse(text.slice(first, last + 1)); } catch {} }
   throw new Error('Model did not return JSON');
 }
