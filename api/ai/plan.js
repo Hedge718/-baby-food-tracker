@@ -2,15 +2,9 @@
 import OpenAI from 'openai';
 
 /**
- * Vercel Node.js Serverless Function (ESM).
- * POST /api/ai/plan with JSON body:
- * {
- *   days: number,
- *   perMealCubes: number,
- *   maxIngredients: number,
- *   onlyInventory: boolean,
- *   inventory: [{ id, name, cubesLeft }]
- * }
+ * Vercel Serverless Function
+ * POST /api/ai/plan
+ * Body: { days, perMealCubes, maxIngredients, onlyInventory, inventory:[{id,name,cubesLeft}] }
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,11 +12,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Manual body parse for Vercel Node functions
+  // ---- parse JSON body (Node, not Next) ----
   let body = {};
   try {
     const chunks = [];
-    for await (const c of req) chunks.push(c);
+    for await (const chunk of req) chunks.push(chunk);
     const raw = Buffer.concat(chunks).toString('utf8');
     body = raw ? JSON.parse(raw) : {};
   } catch {
@@ -43,7 +37,7 @@ export default async function handler(req, res) {
   }
 
   const system = `
-You are a baby meal planner. Return STRICT JSON only (no prose).
+You are a baby meal planner. Output STRICT JSON only (no prose, no code fences).
 Schema:
 {
   "days": [
@@ -61,11 +55,11 @@ Schema:
 }
 Rules:
 - Use at most ${maxIngredients} ingredients per meal.
-- Target about ${perMealCubes} total cubes per meal.
-- If onlyInventory=true, use only item names present in "inventory". Do not invent items.
-- Keep sodium low; no added sugar. No honey if age < 12 months.
-- Mild spices only (e.g., cinnamon, cumin, turmeric, garlic powder, paprika).
-- Return exactly one JSON object matching the schema above.
+- Target about ${perMealCubes} cubes per meal (total).
+- If onlyInventory=true, use ONLY names present in "inventory" (case-insensitive). Do not invent items.
+- Keep sodium low; no added sugar. No honey if under 12 months.
+- Mild spices only: cinnamon, cumin, turmeric, garlic powder, paprika.
+Return exactly one JSON object matching the schema.
 `.trim();
 
   const user = {
@@ -80,30 +74,29 @@ Rules:
   try {
     const openai = new OpenAI({ apiKey });
 
+    // Enforce JSON output at the API level
     const rsp = await openai.responses.create({
       model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
       input: [
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(user) },
       ],
     });
 
-    const text =
+    // Try the SDK helpers first
+    let text =
       rsp.output_text ??
       rsp.content?.[0]?.text ??
       rsp.choices?.[0]?.message?.content ??
       '';
 
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      const m = text.match(/\{[\s\S]*\}$/);
-      if (!m) {
-        return res.status(502).json({ error: 'Model did not return JSON', raw: text });
-      }
-      json = JSON.parse(m[0]);
+    // Some SDK versions return the JSON object parts in content; normalize
+    if (!text && rsp.output?.[0]?.content?.[0]?.type === 'output_text') {
+      text = rsp.output[0].content[0].text || '';
     }
+
+    const json = safeParseJson(text);
 
     if (!json || !Array.isArray(json.days)) {
       return res.status(502).json({ error: 'Bad AI response shape', raw: text });
@@ -114,4 +107,41 @@ Rules:
     console.error('AI plan error:', err);
     return res.status(500).json({ error: err?.message || 'Server error' });
   }
+}
+
+/**
+ * Robustly extract JSON when models wrap in fences or add extra text
+ */
+function safeParseJson(text) {
+  if (!text) throw new Error('Empty model response');
+
+  // 1) direct parse
+  try {
+    return JSON.parse(text);
+  } catch {}
+
+  // 2) fenced code block ```json ... ```
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fence && fence[1]) {
+    const inner = fence[1].trim();
+    try {
+      return JSON.parse(inner);
+    } catch {
+      // fallthrough
+    }
+  }
+
+  // 3) slice from first { to last } (drop any trailing junk/backticks)
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) {
+    const sliced = text.slice(first, last + 1);
+    try {
+      return JSON.parse(sliced);
+    } catch {
+      // fallthrough
+    }
+  }
+
+  throw new Error('Model did not return JSON');
 }
