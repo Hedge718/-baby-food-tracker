@@ -1,208 +1,168 @@
 // src/components/AIShoppingRecs.jsx
-import React, { useEffect, useState } from "react";
-import { ShoppingCart, Wand2, Loader2, CheckSquare, Square, Plus } from "lucide-react";
-import { toast } from "react-hot-toast";
-import { useData } from "../context/DataContext";
-import { generateShoppingIdeas } from "../services/ai";
-import { addItemToShoppingList } from "../firebase";
+import React, { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { useData } from '../context/DataContext';
 
-const SETTINGS_KEY = "aiShoppingSettings";
-const commonAllergens = [
-  "Dairy",
-  "Egg",
-  "Peanut",
-  "Tree nut",
-  "Wheat",
-  "Soy",
-  "Fish",
-  "Shellfish",
-  "Sesame",
-];
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export default function AIShoppingRecs() {
-  const { inventory } = useData();
+  const data = useData();
+  const { inventory = [], shoppingList = [] } = data || {};
 
-  const [days, setDays] = useState(5);
-  const [ageMonths, setAgeMonths] = useState(9);
-  const [avoid, setAvoid] = useState([]);
-  const [notes, setNotes] = useState("");
+  // Wire up whatever add handler exists in your DataContext
+  const addHandler =
+    data?.handleAddShoppingItem ||
+    data?.handleAddItemToShoppingList ||
+    (async (name) => {
+      console.warn('No shopping add handler found, falling back to toast only:', name);
+      toast(name);
+    });
 
+  const [daysToCover, setDaysToCover] = useState(() => Number(localStorage.getItem('shop_days') || 3));
+  const [perDayCubes, setPerDayCubes] = useState(() => Number(localStorage.getItem('shop_perday') || 6));
   const [loading, setLoading] = useState(false);
-  const [recs, setRecs] = useState([]); // [{name, reason, category?, priority?}]
-  const [selected, setSelected] = useState({}); // name -> boolean
+  const [recs, setRecs] = useState([]);
 
-  // load saved
-  useEffect(() => {
+  const shoppingNames = useMemo(
+    () => new Set((shoppingList || []).map(s => String(s.name || '').toLowerCase())),
+    [shoppingList]
+  );
+
+  async function generate() {
+    localStorage.setItem('shop_days', String(daysToCover));
+    localStorage.setItem('shop_perday', String(perDayCubes));
+    setLoading(true);
+    setRecs([]);
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (s.days) setDays(s.days);
-        if (s.ageMonths) setAgeMonths(s.ageMonths);
-        if (Array.isArray(s.avoid)) setAvoid(s.avoid);
-        if (typeof s.notes === "string") setNotes(s.notes);
-      }
-    } catch {}
-  }, []);
-  // save
-  useEffect(() => {
-    const s = { days, ageMonths, avoid, notes };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  }, [days, ageMonths, avoid, notes]);
-
-  const toggleAvoid = (a) =>
-    setAvoid((arr) =>
-      arr.includes(a) ? arr.filter((x) => x !== a) : [...arr, a]
-    );
-
-  const run = async () => {
-    try {
-      setLoading(true);
-      setRecs([]);
-      setSelected({});
-      const r = await generateShoppingIdeas({
-        inventory,
-        days,
-        ageMonths,
-        avoidAllergens: avoid,
-        notes,
+      const res = await fetch(`${API_BASE}/api/ai/shop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daysToCover: Number(daysToCover || 0),
+          perDayCubes: Number(perDayCubes || 0),
+          inventory: (inventory || []).map(i => ({
+            id: i.id,
+            name: i.name,
+            cubesLeft: Number(i.cubesLeft || 0),
+          })),
+          shoppingList: (shoppingList || []).map(s => ({ id: s.id, name: s.name })),
+        }),
       });
-      const list = (r.shopping || []).map((x) => ({
-        name: x.name,
-        reason: x.reason || "",
-        category: x.category || "",
-        priority: typeof x.priority === "number" ? x.priority : 3,
-      }));
-      setRecs(list);
-      const sel = {};
-      list.forEach((x) => (sel[x.name] = true)); // preselect all
-      setSelected(sel);
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${t}`);
+      }
+      const data = await res.json();
+      setRecs(data.items || []);
+      toast.success('Shopping suggestions ready');
     } catch (e) {
-      toast.error(e.message || "Could not get shopping suggestions");
+      console.error('[AI shop] error', e);
+      toast.error('Shopping AI failed. Check console.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const selectAll = (on) => {
-    const sel = {};
-    recs.forEach((x) => (sel[x.name] = !!on));
-    setSelected(sel);
-  };
-
-  const addSelected = async () => {
-    const names = recs.filter((x) => selected[x.name]).map((x) => x.name);
-    if (!names.length) {
-      toast("Nothing selected");
+  async function addOne(name) {
+    if (!name) return;
+    if (shoppingNames.has(String(name).toLowerCase())) {
+      toast('Already on your list');
       return;
     }
-    await Promise.all(names.map((n) => addItemToShoppingList(n)));
-    toast.success(`Added ${names.length} item${names.length !== 1 ? "s" : ""} to Shopping List`);
-  };
+    await addHandler(name);
+    toast.success(`Added ${name}`);
+  }
+
+  async function addAll() {
+    for (const it of recs) {
+      const key = String(it?.name || '').toLowerCase();
+      if (!key || shoppingNames.has(key)) continue;
+      // add quantity times (or your DataContext may support quantity directly—adjust if so)
+      const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
+      for (let i = 0; i < qty; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await addHandler(it.name);
+      }
+    }
+    toast.success('All suggestions added');
+  }
 
   return (
-    <div className="card p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold flex items-center gap-2">
-          <ShoppingCart size={18} /> AI Shopping Recommendations
-        </h3>
-        <button
-          onClick={run}
-          className="btn-primary h-10 px-4"
-          disabled={loading}
-          aria-label="Generate shopping list"
-        >
-          {loading ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />} Generate
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-        <label className="space-y-1 col-span-1">
-          <span className="text-sm text-muted">Days to cover</span>
+    <section className="card space-y-4">
+      <div className="flex items-end gap-3 flex-wrap">
+        <div>
+          <label className="block text-xs text-muted">Days to cover</label>
           <input
-            className="input"
+            className="input w-24"
             type="number"
             min="1"
-            max="14"
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value || 1))}
+            max="30"
+            inputMode="numeric"
+            value={daysToCover}
+            onChange={(e) => setDaysToCover(Number(e.target.value || 1))}
           />
-        </label>
-        <label className="space-y-1 col-span-1">
-          <span className="text-sm text-muted">Age (months)</span>
+        </div>
+        <div>
+          <label className="block text-xs text-muted">Cubes per day</label>
           <input
-            className="input"
+            className="input w-28"
             type="number"
-            min="6"
+            min="1"
             max="24"
-            value={ageMonths}
-            onChange={(e) => setAgeMonths(Number(e.target.value || 6))}
+            inputMode="numeric"
+            value={perDayCubes}
+            onChange={(e) => setPerDayCubes(Number(e.target.value || 1))}
           />
-        </label>
-        <label className="col-span-2 sm:col-span-4 space-y-1">
-          <span className="text-sm text-muted">Notes / preferences (optional)</span>
-          <input
-            className="input"
-            placeholder="e.g., more iron options, dairy-free"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {commonAllergens.map((a) => (
+        </div>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={generate}
+          disabled={loading}
+          aria-busy={loading ? 'true' : 'false'}
+        >
+          {loading ? 'Generating…' : 'Generate'}
+        </button>
+        {!!recs.length && (
           <button
-            key={a}
-            onClick={() => toggleAvoid(a)}
-            className={`pill ${avoid.includes(a) ? "is-active" : ""}`}
+            type="button"
+            className="btn-outline"
+            onClick={addAll}
+            title="Add all suggestions to shopping list"
           >
-            {a}
+            Add All
           </button>
-        ))}
+        )}
       </div>
-
-      {recs.length > 0 && (
-        <>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={() => selectAll(true)} className="pill">
-              <CheckSquare size={16} /> Select all
-            </button>
-            <button onClick={() => selectAll(false)} className="pill">
-              <Square size={16} /> Clear all
-            </button>
-            <button onClick={addSelected} className="pill">
-              <Plus size={16} /> Add selected to Shopping List
-            </button>
-          </div>
-
-          <ul className="divide-y divide-[var(--border-light)] dark:divide-[var(--border-dark)]">
-            {recs.map((x) => (
-              <li key={x.name} className="py-2 flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4"
-                  checked={!!selected[x.name]}
-                  onChange={(e) =>
-                    setSelected((prev) => ({ ...prev, [x.name]: e.target.checked }))
-                  }
-                />
-                <div className="flex-1">
-                  <div className="font-semibold">{x.name}</div>
-                  {x.reason && <div className="text-sm text-muted">{x.reason}</div>}
-                  {x.category && (
-                    <div className="text-xs text-muted mt-0.5">Category: {x.category}</div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
 
       {!recs.length && !loading && (
-        <p className="text-sm text-muted">Get suggestions to diversify nutrition and fill gaps.</p>
+        <div className="text-sm text-muted">No shopping suggestions yet. Set your options and tap Generate.</div>
       )}
-    </div>
+
+      {!!recs.length && (
+        <div className="space-y-2">
+          {recs.map((it, idx) => (
+            <div key={idx} className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-dark)] p-3 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{it.name}</div>
+                <div className="text-xs text-muted">
+                  Qty: {Math.max(1, Math.round(Number(it.quantity) || 1))}
+                  {it.reason ? ` — ${it.reason}` : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => addOne(it.name)}
+                disabled={shoppingNames.has(String(it.name || '').toLowerCase())}
+                title={shoppingNames.has(String(it.name || '').toLowerCase()) ? 'Already on list' : 'Add to shopping'}
+              >
+                {shoppingNames.has(String(it.name || '').toLowerCase()) ? 'On List' : 'Add'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
