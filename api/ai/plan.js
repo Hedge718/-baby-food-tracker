@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Parse JSON body (Node, not Next)
+  // ---- parse JSON body (Node, not Next) ----
   let body = {};
   try {
     const chunks = [];
@@ -74,27 +74,29 @@ Return exactly one JSON object matching the schema.
   try {
     const openai = new OpenAI({ apiKey });
 
-    // ✅ Responses API: use text.format instead of response_format
+    // ✅ Responses API: text.format must be an OBJECT like { type: 'json' }
     const rsp = await openai.responses.create({
       model: 'gpt-4o-mini',
-      text: { format: 'json' }, // <— THIS is the new way
+      temperature: 0.2,
+      text: { format: { type: 'json' } },
       input: [
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(user) },
       ],
     });
 
-    // Try SDK helper first
+    // Try helpers first
     let text =
       rsp.output_text ??
       rsp.content?.[0]?.text ??
       rsp.choices?.[0]?.message?.content ??
       '';
 
-    // Some SDK versions store text in output content parts
+    // Some SDK builds put it under output -> content parts
     if (!text && Array.isArray(rsp.output)) {
-      const part = rsp.output[0]?.content?.find?.(c => c.type === 'output_text');
-      if (part?.text) text = part.text;
+      const parts = rsp.output[0]?.content || [];
+      const textPart = parts.find((p) => p.type === 'output_text');
+      if (textPart?.text) text = textPart.text;
     }
 
     const json = safeParseJson(text);
@@ -110,7 +112,7 @@ Return exactly one JSON object matching the schema.
   }
 }
 
-/** Robustly extract JSON if fences/extra text sneak in */
+/** Robustly extract JSON if fences/extra text sneak in (belt & suspenders) */
 function safeParseJson(text) {
   if (!text) throw new Error('Empty model response');
 
@@ -119,7 +121,7 @@ function safeParseJson(text) {
     return JSON.parse(text);
   } catch {}
 
-  // 2) fenced code block ```json ... ```
+  // 2) fenced block ```json ... ```
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fence?.[1]) {
     try { return JSON.parse(fence[1].trim()); } catch {}
