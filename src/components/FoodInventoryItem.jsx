@@ -1,6 +1,6 @@
 // src/components/FoodInventoryItem.jsx
 import React, { useMemo, useState } from 'react';
-import { Minus, Plus, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Minus, Plus, Calendar, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 
 /**
@@ -10,7 +10,8 @@ import { format } from 'date-fns';
  * - onUpdateStatus(itemId, status)
  * - onSetPortions(itemId, newCubesLeft)
  * - onSetAging(itemId, dateStringYYYYMMDD)
- * - onRestock(item)   // optional – if provided, show a Restock button
+ * - onToggleHidden(itemId, hidden)   // NEW (optional)
+ * - onRestock(item)                  // optional – if provided, show a Restock button
  */
 
 function toYMD(d) {
@@ -26,6 +27,7 @@ export default function FoodInventoryItem({
   onUpdateStatus,
   onSetPortions,
   onSetAging,
+  onToggleHidden, // NEW
   onRestock,
 }) {
   const [qty, setQty] = useState(1);
@@ -57,6 +59,11 @@ export default function FoodInventoryItem({
     if (onSetAging) await onSetAging(item.id, aging);
   };
 
+  const toggleHidden = async () => {
+    if (!onToggleHidden) return;
+    await onToggleHidden(item.id, !item.hidden);
+  };
+
   const progressPct = useMemo(() => {
     const left = portionsLeft;
     const max = maxTrack;
@@ -68,23 +75,27 @@ export default function FoodInventoryItem({
 
   return (
     <div className="rounded-2xl border border-[var(--border-light)] dark:border-[var(--border-dark)] bg-white dark:bg-[var(--card-dark)] p-3 sm:p-4">
-      {/* Row 1: name + age + status */}
+      {/* Row 1: name + chips + status + hide */}
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[15px] clamp-2">{item?.name}</div>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <span className="badge" aria-label={`${portionsLeft} portions left`}>
               {portionsLeft} portions
             </span>
             {madeOnDate && (
-              <span className="inline-flex items-center gap-1" aria-label={`Made on ${format(new Date(madeOnDate), 'MM/dd/yyyy')}`}>
+              <span
+                className="inline-flex items-center gap-1"
+                aria-label={`Made on ${format(new Date(madeOnDate), 'MM/dd/yyyy')}`}
+              >
                 <Calendar size={12} /> {format(new Date(madeOnDate), 'MM/dd')}
               </span>
             )}
+            {item?.hidden && <span className="badge">Hidden</span>}
           </div>
         </div>
 
-        {/* Compact status select */}
+        {/* Status */}
         <select
           className="rounded-xl border bg-transparent px-2 py-1 text-sm"
           value={item?.status || 'Frozen'}
@@ -95,6 +106,18 @@ export default function FoodInventoryItem({
           <option>Fridge</option>
           <option>Pantry</option>
         </select>
+
+        {/* Hide / Unhide (optional) */}
+        {onToggleHidden && (
+          <button
+            className="ml-1 w-9 h-9 rounded-xl border flex items-center justify-center"
+            onClick={toggleHidden}
+            title={item.hidden ? 'Unhide' : 'Hide'}
+            aria-label={item.hidden ? 'Unhide' : 'Hide'}
+          >
+            {item.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+        )}
       </div>
 
       {/* Row 2: progress */}

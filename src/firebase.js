@@ -1,7 +1,10 @@
+// src/firebase.js
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
-  enableIndexedDbPersistence, // optional offline cache
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   getDocs,
   query,
@@ -13,7 +16,6 @@ import {
   writeBatch,
   deleteDoc,
   where,
-  getDoc,
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -25,41 +27,44 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_APP_ID,
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
 
-// Optional: offline persistence (future API change warning is fine)
-enableIndexedDbPersistence(db).catch(() => {});
+// Modern local cache (silences the deprecation warning)
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch {
+  db = getFirestore(app);
+}
+export { db, app };
 
 // ---------- Helpers ----------
 const toTitleCase = (s = '') =>
   String(s).trim().replace(/\s+/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
-// Convert Firestore Timestamp fields to JS Date for convenience
+const parseYMD = (v) => {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  // Accept "YYYY-MM-DD" and coerce to local midnight
+  const d = new Date(String(v) + 'T00:00:00');
+  return isNaN(d) ? null : d;
+};
+
 const docToData = (snap) => {
   const data = snap.data();
   const converted = { ...data };
   for (const key in converted) {
-    if (converted[key] && typeof converted[key].toDate === 'function') {
-      converted[key] = converted[key].toDate();
+    const val = converted[key];
+    if (val && typeof val.toDate === 'function') {
+      converted[key] = val.toDate();
     }
   }
   return { id: snap.id, ...converted };
 };
-
-// Parse either a Date or "YYYY-MM-DD" into *local* midnight (fixes off-by-one due to UTC parsing)
-function toLocalMidnight(dateish) {
-  if (dateish instanceof Date) {
-    return new Date(dateish.getFullYear(), dateish.getMonth(), dateish.getDate());
-  }
-  if (typeof dateish === 'string') {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateish.trim());
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    // fallback: let JS parse other formats (may be UTC if YYYY-MM-DDTHH:mmZ)
-    return new Date(dateish);
-  }
-  return new Date();
-}
 
 // ---------- History ----------
 export async function getHistory() {
@@ -75,17 +80,13 @@ export async function getShoppingList() {
   const snap = await getDocs(query(collection(db, 'shoppingList'), orderBy('createdAt', 'asc')));
   return snap.docs.map(docToData);
 }
-
-// Title Case + also store a normalized lower field for future merges
 export async function addItemToShoppingList(itemName) {
   const title = toTitleCase(itemName);
-  const lower = title.toLowerCase();
-  const docRef = await addDoc(collection(db, 'shoppingList'), {
+  const ref = await addDoc(collection(db, 'shoppingList'), {
     name: title,
-    nameLower: lower,
     createdAt: serverTimestamp(),
   });
-  return { id: docRef.id, name: title, nameLower: lower, createdAt: new Date() };
+  return { id: ref.id, name: title, createdAt: new Date() };
 }
 export async function removeItemFromShoppingList(itemId) {
   await deleteDoc(doc(db, 'shoppingList', itemId));
@@ -97,13 +98,14 @@ export async function getInventory() {
   return snap.docs.map(docToData);
 }
 
-// Merge-aware add: Title Case + nameLower; sum cubes if same item exists
+// Merge-aware add; accepts madeOn as "YYYY-MM-DD" or Date; sets name/title-cased
 export async function addNewInventoryItem(itemData) {
   const title = toTitleCase(itemData.name || '');
   const lower = title.toLowerCase();
-  const qty = Number(itemData.cubesLeft || 0);
+  const qty = Math.max(0, Number(itemData.cubesLeft || 0));
+  const madeOnParsed = parseYMD(itemData.madeOn); // <— accept string
 
-  // try normalized match first
+  // Try match by normalized name
   const q1 = query(collection(db, 'inventory'), where('nameLower', '==', lower));
   const s1 = await getDocs(q1);
   if (!s1.empty) {
@@ -114,104 +116,57 @@ export async function addNewInventoryItem(itemData) {
       nameLower: lower,
       cubesLeft: cur + qty,
       status: itemData.status || 'Frozen',
+      // Only set madeOn if user provided one
+      ...(madeOnParsed ? { madeOn: madeOnParsed } : {}),
       updatedAt: serverTimestamp(),
     });
     return { id: ref.id, name: title };
   }
 
-  // fallback exact Title Case
-  const q2 = query(collection(db, 'inventory'), where('name', '==', title));
-  const s2 = await getDocs(q2);
-  if (!s2.empty) {
-    const ref = doc(db, 'inventory', s2.docs[0].id);
-    const cur = Number(s2.docs[0].data().cubesLeft || 0);
-    await updateDoc(ref, {
-      name: title,
-      nameLower: lower,
-      cubesLeft: cur + qty,
-      status: itemData.status || 'Frozen',
-      updatedAt: serverTimestamp(),
-    });
-    return { id: ref.id, name: title };
-  }
-
-  // create new
-  const madeOn =
-    itemData.madeOn
-      ? toLocalMidnight(itemData.madeOn)
-      : serverTimestamp();
-
-  const docRef = await addDoc(collection(db, 'inventory'), {
+  // Create new
+  const ref = await addDoc(collection(db, 'inventory'), {
     name: title,
     nameLower: lower,
     cubesLeft: qty,
     status: itemData.status || 'Frozen',
     createdAt: serverTimestamp(),
-    madeOn,
+    madeOn: madeOnParsed || serverTimestamp(), // <— set if provided
+    hidden: !!itemData.hidden,
     updatedAt: serverTimestamp(),
   });
-  return { id: docRef.id, name: title, createdAt: new Date() };
+  return { id: ref.id, name: title, createdAt: new Date() };
 }
 
 export async function updateExistingInventoryItem(itemId, newCubesLeft) {
-  const itemRef = doc(db, 'inventory', itemId);
-  await updateDoc(itemRef, { cubesLeft: newCubesLeft, updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, 'inventory', itemId), { cubesLeft: Number(newCubesLeft || 0), updatedAt: serverTimestamp() });
 }
-
 export async function updateInventoryItemStatus(itemId, status) {
-  const itemRef = doc(db, 'inventory', itemId);
-  await updateDoc(itemRef, { status, updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, 'inventory', itemId), { status, updatedAt: serverTimestamp() });
 }
-
-// Hide/unhide an inventory item (e.g., to hide zeros you don't want to see)
 export async function setInventoryHidden(itemId, hidden) {
-  const itemRef = doc(db, 'inventory', itemId);
-  await updateDoc(itemRef, {
-    hidden: !!hidden,
-    updatedAt: serverTimestamp(),
-  });
+  await updateDoc(doc(db, 'inventory', itemId), { hidden: !!hidden, updatedAt: serverTimestamp() });
 }
-
-// Update the "madeOn" date (aging) for an inventory item — uses *local* midnight
+// Accepts "YYYY-MM-DD" or Date
 export async function updateInventoryMadeOn(itemId, madeOnDate) {
-  const itemRef = doc(db, 'inventory', itemId);
-  const date = toLocalMidnight(madeOnDate);
-  await updateDoc(itemRef, {
-    madeOn: date,
-    updatedAt: serverTimestamp(),
-  });
+  const d = parseYMD(madeOnDate);
+  if (!d) throw new Error('Invalid date');
+  await updateDoc(doc(db, 'inventory', itemId), { madeOn: d, updatedAt: serverTimestamp() });
 }
 
-// Log usage + optionally add to shopping list if depleted
 export async function logUsageAndUpdateInventory(item, newCubesLeft, amountUsed, isTrash) {
   const batch = writeBatch(db);
-  const inventoryRef = doc(db, 'inventory', item.id);
-  batch.update(inventoryRef, { cubesLeft: newCubesLeft, updatedAt: serverTimestamp() });
+  batch.update(doc(db, 'inventory', item.id), { cubesLeft: newCubesLeft, updatedAt: serverTimestamp() });
 
   const historyRef = doc(collection(db, 'history'));
-  const newHistoryEntry = {
+  const entry = {
     name: toTitleCase(item.name),
     amount: amountUsed,
     type: isTrash ? 'wasted' : 'eaten',
     timestamp: serverTimestamp(),
   };
-  batch.set(historyRef, newHistoryEntry);
-
-  if (newCubesLeft <= 0) {
-    const lower = toTitleCase(item.name).toLowerCase();
-    const shoppingListQuery = query(collection(db, 'shoppingList'), where('nameLower', '==', lower));
-    const existingSnap = await getDocs(shoppingListQuery);
-    if (existingSnap.empty) {
-      const shoppingListRef = doc(collection(db, 'shoppingList'));
-      batch.set(shoppingListRef, {
-        name: toTitleCase(item.name),
-        nameLower: lower,
-        createdAt: serverTimestamp(),
-      });
-    }
-  }
+  batch.set(historyRef, entry);
   await batch.commit();
-  return { ...newHistoryEntry, id: historyRef.id, timestamp: new Date() };
+  return { ...entry, id: historyRef.id, timestamp: new Date() };
 }
 
 // ---------- Recipes ----------
@@ -220,49 +175,25 @@ export async function getRecipes() {
   return snap.docs.map(docToData);
 }
 export async function addRecipe(recipeData) {
-  const docRef = await addDoc(collection(db, 'recipes'), { ...recipeData, createdAt: serverTimestamp() });
-  return { id: docRef.id, ...recipeData, createdAt: new Date() };
+  const ref = await addDoc(collection(db, 'recipes'), { ...recipeData, createdAt: serverTimestamp() });
+  return { id: ref.id, ...recipeData, createdAt: new Date() };
 }
 export async function deleteRecipe(recipeId) {
   await deleteDoc(doc(db, 'recipes', recipeId));
 }
 
-export async function cookRecipeInDb(recipe, inventory) {
-  const batch = writeBatch(db);
-  const updatedInventoryItems = [];
-
-  for (const ingredient of recipe.ingredients) {
-    const inventoryItem = inventory.find(i => i.id === ingredient.itemId);
-    if (inventoryItem) {
-      const inventoryRef = doc(db, 'inventory', ingredient.itemId);
-      const newCubesLeft = inventoryItem.cubesLeft - ingredient.cubesRequired;
-      batch.update(inventoryRef, { cubesLeft: newCubesLeft, updatedAt: serverTimestamp() });
-      updatedInventoryItems.push({ id: ingredient.itemId, newCubesLeft });
-    }
-  }
-  const historyRef = doc(collection(db, 'history'));
-  const totalCubes = recipe.ingredients.reduce((sum, ing) => sum + ing.cubesRequired, 0);
-  const newHistoryEntry = { name: recipe.name, amount: totalCubes, type: 'recipe', timestamp: serverTimestamp() };
-  batch.set(historyRef, newHistoryEntry);
-  await batch.commit();
-
-  return { newHistoryEntry: { ...newHistoryEntry, id: historyRef.id, timestamp: new Date() }, updatedInventoryItems };
-}
-
-// ---------- Meal Plans ----------
+// ---------- Planner ----------
 export async function getMealPlans() {
   const snap = await getDocs(query(collection(db, 'mealPlans'), orderBy('date', 'asc')));
   return snap.docs.map(docToData);
 }
-
-// IMPORTANT: store date at *local midnight* to avoid off-by-one in US timezones
 export async function addMealPlan(planData) {
-  const localDate = toLocalMidnight(planData.date);
-  const docRef = await addDoc(collection(db, 'mealPlans'), {
+  const ref = await addDoc(collection(db, 'mealPlans'), {
     ...planData,
-    date: localDate,
+    date: new Date(planData.date),
+    createdAt: serverTimestamp(),
   });
-  return { id: docRef.id, ...planData, date: localDate };
+  return { id: ref.id, ...planData };
 }
 export async function deleteMealPlan(planId) {
   await deleteDoc(doc(db, 'mealPlans', planId));

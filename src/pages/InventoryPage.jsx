@@ -26,12 +26,16 @@ function downloadCsv(filename, rows) {
 
 export default function InventoryPage() {
   const {
-    inventory, loading,
+    // Use fullInventory so we can see zero-stock + hidden items when requested
+    fullInventory,
+    loading,
+    // item actions
     handleLogUsage,
     handleUpdateItemStatus,
     handleSetPortions,
     handleSetAging,
-    handleRestock
+    handleToggleHidden, // <-- pass this to rows so you can hide/unhide
+    handleRestock,      // optional; if undefined, restock button is hidden
   } = useData();
 
   const [search, setSearch] = useState('');
@@ -39,17 +43,18 @@ export default function InventoryPage() {
   const [showHidden, setShowHidden] = useState(false);
   const [sort, setSort] = useState('oldest'); // oldest | newest | name
 
+  // Stats should be based on fullInventory too
   const stats = useMemo(() => {
-    const items = inventory || [];
+    const items = fullInventory || [];
     const inStock = items.filter(i => (i.cubesLeft ?? 0) > 0).length;
     const totalCubes = items.reduce((s, i) => s + (Number(i.cubesLeft) || 0), 0);
     const out = items.length - inStock;
     return { items: items.length, inStock, out, totalCubes };
-  }, [inventory]);
+  }, [fullInventory]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = (inventory || []).filter(i => (showHidden ? true : !i.hidden));
+    let list = (fullInventory || []).filter(i => (showHidden ? true : !i.hidden));
 
     if (tab === 'in') list = list.filter(i => (i.cubesLeft ?? 0) > 0);
     if (tab === 'out') list = list.filter(i => (i.cubesLeft ?? 0) <= 0);
@@ -65,10 +70,10 @@ export default function InventoryPage() {
     });
 
     return list;
-  }, [inventory, tab, showHidden, search, sort]);
+  }, [fullInventory, tab, showHidden, search, sort]);
 
   const onExport = () => {
-    const rows = (inventory || []).map(i => ({
+    const rows = (fullInventory || []).map(i => ({
       name: i.name,
       cubesLeft: i.cubesLeft ?? 0,
       status: i.status || 'Frozen',
@@ -117,7 +122,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Controls — now sticky */}
+      {/* Controls — sticky */}
       <div className="card sticky top-2 z-20">
         <input
           className="input"
@@ -177,6 +182,7 @@ export default function InventoryPage() {
               onUpdateStatus={handleUpdateItemStatus}
               onSetPortions={handleSetPortions}
               onSetAging={handleSetAging}
+              onToggleHidden={handleToggleHidden}  // <-- add this
               onRestock={handleRestock}
             />
           ))

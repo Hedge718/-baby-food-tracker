@@ -1,71 +1,78 @@
+// src/components/InventoryForm.jsx
 import React, { useState } from 'react';
-import { PlusCircle, ShoppingCart } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useData } from '../context/DataContext';
 
-export default function InventoryForm({ onAddFood }) {
+export default function InventoryForm() {
+  const { handleAddFood } = useData();
   const [name, setName] = useState('');
-  const [cubes, setCubes] = useState(12);
-  const [isForShoppingList, setIsForShoppingList] = useState(false);
-  const [status, setStatus] = useState('new');
+  const [cubesLeft, setCubesLeft] = useState(6);
+  const [status, setStatus] = useState('Frozen');
+  const [madeOn, setMadeOn] = useState(''); // YYYY-MM-DD
 
-  const handleSubmit = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) {
-        toast.error("Please enter a food name.");
-        return;
-    }
-
-    if (isForShoppingList) {
-        await onAddFood({ name, isForShoppingList: true });
-    } else {
-        if (cubes > 0) {
-            await onAddFood({ name, cubesLeft: Number(cubes), status, isForShoppingList: false });
-        } else {
-            toast.error("Please enter a cube count greater than zero.");
-        }
-    }
-    
+    if (!name.trim()) return;
+    await handleAddFood({
+      name,
+      cubesLeft: Number(cubesLeft || 0),
+      status,
+      madeOn: madeOn || undefined, // pass only if user set it
+    });
     setName('');
-    setCubes(12);
-    setStatus('new');
-    setIsForShoppingList(false);
+    setCubesLeft(6);
+    setStatus('Frozen');
+    setMadeOn('');
   };
 
   return (
-    <div className="card">
-      <h3 className="text-xl mb-4">Add Food</h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <section className="card space-y-3">
+      <h3 className="text-lg font-bold">Add Food</h3>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <input
+          className="input w-full"
+          placeholder="Name (e.g., Sweet Potato)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-muted">Portions</label>
+            <input
+              className="input w-full"
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={cubesLeft}
+              onChange={(e) => setCubesLeft(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-muted">Status</label>
+            <select
+              className="input w-full"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option>Frozen</option>
+              <option>Fridge</option>
+              <option>Pantry</option>
+            </select>
+          </div>
+        </div>
+
         <div>
-          <label htmlFor="foodName" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Food Name</label>
-          <input id="foodName" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Pear" className="input-field" required />
-        </div>
-        
-        {!isForShoppingList && (
-            <>
-                <div>
-                  <label htmlFor="cubes" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Number of Cubes in Batch</label>
-                  <input id="cubes" type="number" value={cubes} onChange={(e) => setCubes(e.target.value)} className="input-field" min="1" required />
-                </div>
-                <div>
-                  <label htmlFor="status" className="block text-sm font-bold text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)] mb-1">Initial Status</label>
-                  <select id="status" value={status} onChange={e => setStatus(e.target.value)} className="input-field">
-                      <option value="new">New Food</option>
-                      <option value="liked">Liked</option>
-                  </select>
-                </div>
-            </>
-        )}
-
-        <div className="flex items-center gap-2 pt-2">
-            <input type="checkbox" id="isForShoppingList" checked={isForShoppingList} onChange={(e) => setIsForShoppingList(e.target.checked)} className="h-4 w-4 rounded text-[var(--accent-light)] focus:ring-[var(--accent-light)]"/>
-            <label htmlFor="isForShoppingList" className="text-sm text-[var(--text-secondary-light)] dark:text-[var(--text-secondary-dark)]">Add to shopping list instead</label>
+          <label className="block text-xs text-muted">Made On (optional)</label>
+          <input
+            className="input w-full"
+            type="date"
+            value={madeOn}
+            onChange={(e) => setMadeOn(e.target.value)}
+          />
         </div>
 
-        <button type="submit" className="btn-primary w-full !mt-6">
-          {isForShoppingList ? <ShoppingCart size={20} /> : <PlusCircle size={20} />}
-          <span>{isForShoppingList ? 'Add to Shopping List' : 'Add to Inventory'}</span>
-        </button>
+        <button className="btn-primary w-full" type="submit">Add</button>
       </form>
-    </div>
+    </section>
   );
 }
