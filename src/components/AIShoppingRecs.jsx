@@ -9,12 +9,13 @@ export default function AIShoppingRecs() {
   const data = useData();
   const { inventory = [], shoppingList = [] } = data || {};
 
-  // Wire up whatever add handler exists in your DataContext
+  // Prefer your context handler (we expose multiple names)
   const addHandler =
     data?.handleAddShoppingItem ||
+    data?.handleAddToShoppingList ||
     data?.handleAddItemToShoppingList ||
     (async (name) => {
-      console.warn('No shopping add handler found, falling back to toast only:', name);
+      console.warn('No shopping add handler found; showing toast only:', name);
       toast(name);
     });
 
@@ -53,7 +54,8 @@ export default function AIShoppingRecs() {
         throw new Error(`HTTP ${res.status}: ${t}`);
       }
       const data = await res.json();
-      setRecs(data.items || []);
+      const next = (data.items || []).filter(it => !shoppingNames.has(String(it?.name || '').toLowerCase()));
+      setRecs(next);
       toast.success('Shopping suggestions ready');
     } catch (e) {
       console.error('[AI shop] error', e);
@@ -77,7 +79,7 @@ export default function AIShoppingRecs() {
     for (const it of recs) {
       const key = String(it?.name || '').toLowerCase();
       if (!key || shoppingNames.has(key)) continue;
-      // add quantity times (or your DataContext may support quantity directly—adjust if so)
+      // quantity is optional; add 1+ times if present
       const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
       for (let i = 0; i < qty; i++) {
         // eslint-disable-next-line no-await-in-loop
@@ -124,43 +126,44 @@ export default function AIShoppingRecs() {
           {loading ? 'Generating…' : 'Generate'}
         </button>
         {!!recs.length && (
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={addAll}
-            title="Add all suggestions to shopping list"
-          >
+          <button type="button" className="btn-outline" onClick={addAll}>
             Add All
           </button>
         )}
       </div>
 
       {!recs.length && !loading && (
-        <div className="text-sm text-muted">No shopping suggestions yet. Set your options and tap Generate.</div>
+        <div className="text-sm text-muted">
+          No shopping suggestions yet. Set your options and tap Generate.
+          {daysToCover ? ` (Target: ${daysToCover} day${daysToCover>1?'s':''})` : null}
+        </div>
       )}
 
       {!!recs.length && (
         <div className="space-y-2">
-          {recs.map((it, idx) => (
-            <div key={idx} className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-dark)] p-3 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold">{it.name}</div>
-                <div className="text-xs text-muted">
-                  Qty: {Math.max(1, Math.round(Number(it.quantity) || 1))}
-                  {it.reason ? ` — ${it.reason}` : ''}
+          {recs.map((it, idx) => {
+            const exists = shoppingNames.has(String(it.name || '').toLowerCase());
+            return (
+              <div key={idx} className="rounded-xl border border-[var(--border-light)] dark:border-[var(--border-dark)] p-3 flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold">{it.name}</div>
+                  <div className="text-xs text-muted">
+                    Qty: {Math.max(1, Math.round(Number(it.quantity) || 1))}
+                    {it.reason ? ` — ${it.reason}` : ''}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => addOne(it.name)}
+                  disabled={exists}
+                  title={exists ? 'Already on list' : 'Add to shopping'}
+                >
+                  {exists ? 'On List' : 'Add'}
+                </button>
               </div>
-              <button
-                type="button"
-                className="pill"
-                onClick={() => addOne(it.name)}
-                disabled={shoppingNames.has(String(it.name || '').toLowerCase())}
-                title={shoppingNames.has(String(it.name || '').toLowerCase()) ? 'Already on list' : 'Add to shopping'}
-              >
-                {shoppingNames.has(String(it.name || '').toLowerCase()) ? 'On List' : 'Add'}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
